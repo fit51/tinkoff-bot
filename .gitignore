@@ -1,0 +1,24 @@
+target
+
+# Intellij Idea
+*.iml
+.idea/**
+.idea
+!/.idea/copyright/
+!/.idea/inspectionProfiles/
+!/.idea/runConfigurations/
+!/.idea/scopes/
+!/.idea/codeStyleSettings.xml
+!/.idea/dataSources.ids
+!/.idea/dataSources.xml
+!/.idea/encodings.xml
+!/.idea/highlighting.xml
+!/.idea/vcs.xml
+/.idea_modules
+**/project/target
+**/project/project/target
+#telegram key
+src/main/resources/telegram.conf
+
+# WorkSheet files
+*.sc
