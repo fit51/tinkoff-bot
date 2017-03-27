@@ -7,7 +7,6 @@ import com.typesafe.config.ConfigFactory
   * Main class
   */
 object Main extends App {
-  lazy val token = ConfigFactory.load("telegram").getString("telegram.key")
   implicit val system = ActorSystem()
 
   val noSessionActions = system.actorOf(NoSessionActions.props)

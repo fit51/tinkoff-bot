@@ -42,7 +42,7 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef) exte
             update.message.text match {
               case s: String if s == "/rates" || s == "/r" => {
                 // – для получения курсов
-                noSessionActions ! NoSessionActions.Rates(update.message)
+                noSessionActions ! NoSessionActions.GetRates(update.message)
               }
               case s: String if s == "/balance" || s == "/b" => {
                 // – для получения текущих балансов
