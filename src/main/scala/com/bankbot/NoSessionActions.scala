@@ -3,9 +3,9 @@ package com.bankbot
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
-import scala.util.{Failure, Success}
 
-import telegram.TelegramTypes.Message
+import scala.util.{Failure, Success}
+import telegram.TelegramTypes.{KeyboardButton, Message}
 import telegram.PrettyMessage
 
 /**
@@ -17,6 +17,7 @@ object NoSessionActions {
   def props = Props(new NoSessionActions())
 
   case class Rates(m: Message)
+  case class Contact(m: Message)
   case class Reply(m: Message, text: String)
 }
 
@@ -49,6 +50,16 @@ class NoSessionActions extends Actor with ActorLogging with tinkoff.MessageMarsh
         }
       }
     }
+    case Contact(message: Message) => {
+      val messageText = "This operation requires your phone number."
+      // отправляем юзеру маркап кнопки
+      val send = Map("chat_id" -> message.chat.id.toString, "text" -> messageText,
+        "reply_markup" -> "{\"keyboard\":[[{\"text\":\"Send number\", \"request_contact\": true}]]}")
+      telegramApi.sendMessage(send) onComplete {
+        case Success(_) => log.info("Contact button successfully send to " + message.from)
+        case Failure(t) => log.info("Contact button send failed: " + t.getMessage + " to " + message.from)
+      }
+    }
     case Reply(message: Message, text) => {
       val send = Map("chat_id" -> message.chat.id.toString,
         "text" -> text, "parse_mode" -> "HTML")
@@ -58,5 +69,4 @@ class NoSessionActions extends Actor with ActorLogging with tinkoff.MessageMarsh
       }
     }
   }
-
 }
