@@ -1,16 +1,15 @@
 package com.bankbot
 
-import java.sql.Timestamp
+import java.time.{Instant, ZoneId}
 
 import akka.actor.{Actor, ActorLogging, Props}
 import akka.http.scaladsl.Http
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 
-import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 import telegram.TelegramTypes.Message
 import telegram.PrettyMessage
-import tinkoff.TinkoffTypes.{ Rate, ServerAnswer }
+import tinkoff.TinkoffTypes.{Rate, ServerAnswer}
 
 /**
   * Actor used for actions that do not require authentication
@@ -18,14 +17,14 @@ import tinkoff.TinkoffTypes.{ Rate, ServerAnswer }
   */
 
 object NoSessionActions {
-  def props = Props(new NoSessionActions())
+  def props(updateRatesInterval: Int) = Props(new NoSessionActions(updateRatesInterval))
 
   case class GetRates(m: Message)
   case object UpdateRates
   case class Reply(m: Message, text: String)
 }
 
-class NoSessionActions extends Actor with ActorLogging with tinkoff.MessageMarshallingTinkoff {
+class NoSessionActions(updateRatesInterval: Int) extends Actor with ActorLogging with tinkoff.MessageMarshallingTinkoff {
 
   import NoSessionActions._
   import context.dispatcher
@@ -33,9 +32,9 @@ class NoSessionActions extends Actor with ActorLogging with tinkoff.MessageMarsh
   final implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(context.system))
   val telegramApi = new telegram.TelegramApi(Http(context.system), materializer, log, context.dispatcher)
   val tinkoffApi = new tinkoff.TinkoffApi(Http(context.system), materializer, log, context.dispatcher, self)
-  val update_tick = context.system.scheduler.schedule(1 second, 2 second, self, UpdateRates)
+  val update_tick = context.system.scheduler.schedule(1 second, updateRatesInterval millis, self, UpdateRates)
   var rates: Vector[Rate] = Vector()
-  var last_update = new Timestamp(0L)
+  var last_update = Instant.ofEpochMilli(0L)
 
   override def postStop() = {
     update_tick.cancel
@@ -46,8 +45,8 @@ class NoSessionActions extends Actor with ActorLogging with tinkoff.MessageMarsh
     case UpdateRates => tinkoffApi.getRates()
 
     case ServerAnswer(newLastUpdate, newRates) => {
-      val date = new Timestamp(newLastUpdate)
-      if(date.after(last_update)) {
+      val date = Instant.ofEpochMilli(newLastUpdate)
+      if(date.isAfter(last_update)) {
         rates = newRates
         last_update = date
       }
@@ -55,7 +54,9 @@ class NoSessionActions extends Actor with ActorLogging with tinkoff.MessageMarsh
 
     case GetRates(message: Message) => {
           val send = Map("chat_id" -> message.chat.id.toString,
-            "text" -> PrettyMessage.prettyRates(last_update, rates), "parse_mode" -> "HTML")
+            "text" -> PrettyMessage.prettyRates(
+              last_update, rates, ZoneId.of("Europe/Moscow")
+            ), "parse_mode" -> "HTML")
           telegramApi.sendMessage(send)
     }
 
