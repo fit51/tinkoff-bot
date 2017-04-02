@@ -22,3 +22,4 @@ src/main/resources/telegram.conf
 
 # WorkSheet files
 *.sc
+*.log
