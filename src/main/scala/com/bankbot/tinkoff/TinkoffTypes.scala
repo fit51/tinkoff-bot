@@ -10,7 +10,7 @@ import scala.util.{Success, Try}
 
 object TinkoffTypes {
 
-  case class ServerAnswer(rates: Vector[Rate])
+  case class ServerAnswer(last_update: Long, rates: Vector[Rate])
 
   case class Currency(code: Int, name: String)
 
@@ -39,12 +39,18 @@ trait MessageMarshallingTinkoff extends DefaultJsonProtocol {
         rate.convertTo[Rate]
       }
       value.asJsObject.getFields("resultCode", "payload") match {
-        case Seq(JsString(resultCode), JsObject(payload)) => payload("rates") match {
-          case JsArray(rates) => {
-            val serializedRates = for (rate: JsValue <- rates) yield getPrepaidCardsOperations(rate)
-            new ServerAnswer(serializedRates collect { case Success(r) => r })
+        case Seq(JsString(resultCode), JsObject(payload)) => {
+          val last_update = payload("lastUpdate").asJsObject("Rates expected").getFields("milliseconds") match {
+            case Seq(JsNumber(last_update)) => last_update
+            case _ => throw new DeserializationException("Rates expected")
           }
-          case _ => throw new DeserializationException("Rates expected")
+          payload("rates") match {
+            case JsArray(rates) => {
+              val serializedRates = for (rate: JsValue <- rates) yield getPrepaidCardsOperations(rate)
+              new ServerAnswer(last_update.toLong, serializedRates collect { case Success(r) => r })
+            }
+            case _ => throw new DeserializationException("Rates expected")
+          }
         }
       }
     }

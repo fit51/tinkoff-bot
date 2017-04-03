@@ -1,5 +1,8 @@
 package com.bankbot.telegram
 
+import java.time.{Instant, ZoneId}
+import java.time.format.DateTimeFormatter
+
 import com.bankbot.tinkoff.TinkoffTypes.Rate
 
 /**
@@ -8,7 +11,13 @@ import com.bankbot.tinkoff.TinkoffTypes.Rate
 
 object PrettyMessage {
 
-  def prettyRates(rates: Vector[Rate]) = {
+  val format = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+  def prettyRates(last_update: Instant, rates: Vector[Rate], zoneId: ZoneId) = {
+    if(rates.isEmpty)
+      "Rates are not updated yet"
+    else
+    s"LastUpdate:\t${last_update.atZone(zoneId).format(format)}\n" +
     "<b>From</b>\t<b>To</b>\t<b>Sell</b>\t<b>Buy</b>\n" +
       (rates.map { rate =>
       rate.fromCurrency.name + "\t"+ rate.toCurrency.name + "\t" +rate.sell + "\t" + rate.buy + "\n"

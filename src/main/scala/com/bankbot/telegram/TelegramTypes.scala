@@ -18,7 +18,7 @@ object TelegramTypes {
 
   case class Chat(id: Int, c_type: String)
 
-  case class Message(message_id: Int, from: User, chat: Chat, date: Int, text: String)
+  case class Message(message_id: Int, from: User, chat: Chat, date: Int, text: Option[String])
 
   case class Update(update_id: Int, message: Message)
 

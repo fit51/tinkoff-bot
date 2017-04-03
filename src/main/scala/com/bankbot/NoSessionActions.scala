@@ -1,12 +1,16 @@
 package com.bankbot
 
-import akka.actor.{Actor, ActorLogging, Props}
-import akka.http.scaladsl.Http
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
-import scala.util.{Failure, Success}
+import java.time.{Instant, ZoneId}
 
+import akka.actor.{Actor, ActorLogging, Props, Scheduler}
+import akka.event.LoggingAdapter
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
+import com.bankbot.tinkoff.TinkoffApi
+
+import scala.concurrent.duration._
 import telegram.TelegramTypes.Message
-import telegram.PrettyMessage
+import telegram.{PrettyMessage, TelegramApi}
+import tinkoff.TinkoffTypes.{Rate, ServerAnswer}
 
 /**
   * Actor used for actions that do not require authentication
@@ -14,48 +18,57 @@ import telegram.PrettyMessage
   */
 
 object NoSessionActions {
-  def props = Props(new NoSessionActions())
+  def props(scheduler: Scheduler, updateRatesInterval: Int, telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =  Props(
+    classOf[NoSessionActions], scheduler: Scheduler, updateRatesInterval, telegramApi, tinkoffApi
+  )
 
-  case class Rates(m: Message)
+  case object GetRates
+  case class SendRates(m: Message)
+  case object UpdateRates
   case class Reply(m: Message, text: String)
 }
 
-class NoSessionActions extends Actor with ActorLogging with tinkoff.MessageMarshallingTinkoff {
-
+class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramApi: TelegramApi,
+                       tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
   import NoSessionActions._
   import context.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(context.system))
+  implicit val logger: LoggingAdapter = log
 
-  final implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(context.system))
-  val telegramApi = new telegram.TelegramApi(Http(context.system), materializer, log, context.dispatcher)
-  val tinkoffApi = new tinkoff.TinkoffApi(Http(context.system), materializer, log, context.dispatcher)
+  val updateCancellable = scheduler.schedule(1 second, updateRatesInterval millis, self, UpdateRates)
+  var rates: Vector[Rate] = Vector()
+  var last_update = Instant.ofEpochMilli(0L)
+
+  override def postStop() = {
+    updateCancellable.cancel
+  }
 
   override def receive: Receive = {
-    case Rates(message: Message) => {
-      tinkoffApi.getRates map { v =>
-        PrettyMessage.prettyRates(v)
-      } recover {
-        case t: Exception => {
-          log.info("Error getRates:" + t.getMessage)
-          "Something went wrong"
-        }
-      } onSuccess {
-        case s: String => {
-          val send = Map("chat_id" -> message.chat.id.toString,
-            "text" -> s, "parse_mode" -> "HTML")
-          telegramApi.sendMessage(send) onComplete {
-            case Success(_) => log.info("Rates successfully send to " + message.from)
-            case Failure(t) => log.info("Rates send failed: " + t.getMessage + " to " + message.from)
-          }
-        }
+
+    case UpdateRates => tinkoffApi.getRates()
+
+    case GetRates => sender ! rates
+
+    case ServerAnswer(newLastUpdate, newRates) => {
+      val date = Instant.ofEpochMilli(newLastUpdate)
+      if(date.isAfter(last_update)) {
+        rates = newRates
+        last_update = date
       }
     }
+
+    case SendRates(message: Message) => {
+          val send = Map("chat_id" -> message.chat.id.toString,
+            "text" -> PrettyMessage.prettyRates(
+              last_update, rates, ZoneId.of("Europe/Moscow")
+            ), "parse_mode" -> "HTML")
+          telegramApi.sendMessage(send)
+    }
+
     case Reply(message: Message, text) => {
       val send = Map("chat_id" -> message.chat.id.toString,
         "text" -> text, "parse_mode" -> "HTML")
-      telegramApi.sendMessage(send) onComplete {
-        case Success(_) => log.info("Reply successfully send to " + message.from)
-        case Failure(t) => log.info("Reply send failed: " + t.getMessage + " to " + message.from)
-      }
+      telegramApi.sendMessage(send)
     }
   }
 
