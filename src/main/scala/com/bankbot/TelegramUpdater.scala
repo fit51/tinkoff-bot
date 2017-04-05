@@ -28,15 +28,29 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
   def receive = {
     case ServerAnswer(true, result) => {
       for (update <- result) {
-        log.info("Got update, body: " + update)
+        // - Пока не понимаю, как убрать это отсюда,
+        // - т.к. сообщение от пользователя после нажатия кнопки
+        // - прилетит сюда.
+        if (update.message.contact.nonEmpty) {
+          if (!SessionManager.contacts.contains(update.message.from)) {
+            sessionManager ! update.message
+          }
+        }
         update.message.text match {
+          // - Если кто-то пытается пользоваться без авторизации,
+          // - то ему придёт кнопка отправки контакта.
+          case Some(s) if s == "/balance" || s == "/history" &&
+            !SessionManager.contacts.contains(update.message.from) => {
+            sessionManager ! SessionManager.ContactRequest(update.message)
+          }
           case Some(s) if s == "/rates" || s == "/r" => {
             // – для получения курсов
             noSessionActions ! NoSessionActions.SendRates(update.message)
           }
-          case Some(s) if s == "/balance" || s == "/b" => {
+          case Some(s) if s == "/balance" || s == "/b" &&
+            SessionManager.contacts.contains(update.message.from) => {
             // – для получения текущих балансов
-            noSessionActions ! NoSessionActions.Reply(update.message, "Not implemented yet")
+//            sessionManager ! SessionManager.SendBalance(update.message)
           }
           case Some(s) if s == "/history" || s == "/hi" => {
             // – для истории операций
