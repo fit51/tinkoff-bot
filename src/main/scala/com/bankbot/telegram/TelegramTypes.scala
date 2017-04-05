@@ -41,6 +41,6 @@ trait MessageMarshallingTelegram extends DefaultJsonProtocol {
   implicit val chatFormat = jsonFormat(Chat, "id", "type")
   implicit val messageFormat = jsonFormat5(Message)
   implicit val updateFormat = jsonFormat2(Update)
-  implicit val serverAnswer = jsonFormat2(ServerAnswer)
+  implicit val serverAnswerFormat = jsonFormat2(ServerAnswer)
 
 }

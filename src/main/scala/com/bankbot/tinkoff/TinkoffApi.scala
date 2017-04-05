@@ -5,8 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.stream.ActorMaterializer
-
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import TinkoffTypes._
 import akka.actor.{ActorContext, ActorRef, ActorSystem}
 import com.bankbot.CommonTypes._
@@ -18,7 +17,7 @@ import com.bankbot.CommonTypes._
 
 
 trait TinkoffApi {
-  def getRates()(implicit materializer: ActorMaterializer, context: ActorContext, logger: LoggingAdapter)
+  def getRates()(implicit context: ActorContext, logger: LoggingAdapter)
 }
 
 class TinkoffApiImpl(processingActor: => ActorRef)(implicit system: ActorSystem)
@@ -26,22 +25,23 @@ class TinkoffApiImpl(processingActor: => ActorRef)(implicit system: ActorSystem)
 
   final val url = "https://www.tinkoff.ru/api/v1/"
   lazy val http = Http(system)
+  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system))
 
-  def getRates()(implicit materializer: ActorMaterializer, context: ActorContext, logger: LoggingAdapter): Unit = {
+  def getRates()(implicit context: ActorContext, logger: LoggingAdapter): Unit = {
     import akka.pattern.pipe
     import context.dispatcher
 
     val uri = Uri(url + "/currency_rates")
-    val response = http.singleRequest(HttpRequest(uri = uri))(materializer)
+    val response = http.singleRequest(HttpRequest(uri = uri))
     (response flatMap {
       case HttpResponse(StatusCodes.OK, headers, entity, _) => {
-        logger.info("Tinkoff getRates Request Success")
+        logger.debug("Tinkoff getRates Request Success")
         Unmarshal(entity).to[ServerAnswer] map { a =>
           ServerAnswer(a.last_update, a.rates.filter(_.category equalsIgnoreCase ("PrepaidCardsOperations")))
         }
       }
       case HttpResponse(code, _, entity, _) => {
-        logger.info("Tinkoff getRates Request failed, response code: " + code)
+        logger.warning("Tinkoff getRates Request failed, response code: " + code)
         throw ResponceCodeException("Tinkoff Responce code:", entity)
       }
     }).pipeTo(processingActor)

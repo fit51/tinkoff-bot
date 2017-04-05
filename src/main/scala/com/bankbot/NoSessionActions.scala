@@ -32,7 +32,6 @@ class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramA
                        tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
   import NoSessionActions._
   import context.dispatcher
-  implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(context.system))
   implicit val logger: LoggingAdapter = log
 
   val updateCancellable = scheduler.schedule(1 second, updateRatesInterval millis, self, UpdateRates)
