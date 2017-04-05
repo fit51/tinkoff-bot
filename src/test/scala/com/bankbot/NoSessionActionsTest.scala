@@ -4,7 +4,6 @@ import java.time.{Instant, ZoneId}
 
 import akka.actor.{ActorContext, ActorSystem}
 import akka.event.LoggingAdapter
-import akka.stream.ActorMaterializer
 import akka.testkit.{ImplicitSender, TestKit}
 import com.bankbot.NoSessionActions._
 import com.bankbot.telegram.{PrettyMessage, TelegramApi}
@@ -13,7 +12,8 @@ import com.bankbot.tinkoff.TinkoffApi
 import com.bankbot.tinkoff.TinkoffTypes.{Currency, Rate}
 import com.miguno.akka.testing.VirtualTime
 import org.scalatest.mockito.MockitoSugar
-import org.mockito.Mockito.{ verify, timeout }
+import org.scalatest.concurrent.Eventually
+import org.mockito.Mockito.{ verify, times => ts}
 import org.mockito.Matchers.{eq => exact, _}
 import org.scalatest.{Matchers, WordSpecLike}
 
@@ -27,6 +27,7 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
   with WordSpecLike
   with Matchers
   with MockitoSugar
+  with Eventually
   with StopSystemAfterAll {
 
   val tinkoffApiTest = mock[TinkoffApi]
@@ -42,12 +43,11 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
 
   "NoSessionActions" must {
     "update Rates every 2 seconds" in {
-      verify(tinkoffApiTest, timeout(100).never()).getRates()(any(classOf[ActorMaterializer]),
-        any(classOf[ActorContext]), any(classOf[LoggingAdapter]))
-      time.advance(6 second)
-      time.elapsed shouldBe (7 second)
-      verify(tinkoffApiTest, timeout(100).times(3)).getRates()(any(classOf[ActorMaterializer]),
-        any(classOf[ActorContext]), any(classOf[LoggingAdapter]))
+      time.advance(5 second)
+      time.elapsed shouldBe (6 second)
+      eventually {
+        verify(tinkoffApiTest, ts(3)).getRates()(any(classOf[ActorContext]), any(classOf[LoggingAdapter]))
+      }
     }
     "set newest Rates when it receives a ServerAnswer" in {
       import com.bankbot.tinkoff.TinkoffTypes.ServerAnswer
@@ -65,16 +65,20 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
         "text" -> PrettyMessage.prettyRates(
           Instant.ofEpochMilli(2L), Vector(rateNew), ZoneId.of("Europe/Moscow")
         ), "parse_mode" -> "HTML")
-      verify(telegramApiTest, timeout(100)).sendMessage(exact(send))(any(classOf[ActorContext]),
-        any(classOf[LoggingAdapter]))
+      eventually {
+        verify(telegramApiTest).sendMessage(exact(send))(any(classOf[ActorContext]),
+          any(classOf[LoggingAdapter]))
+      }
     }
     "send reply to Telegram Message when requested" in {
       val testText = "test text"
       noSessionActions ! Reply(testMessage, testText)
       val send = Map("chat_id" -> testChat.id.toString,
         "text" -> testText, "parse_mode" -> "HTML")
-      verify(telegramApiTest, timeout(100)).sendMessage(exact(send))(any(classOf[ActorContext]),
-        any(classOf[LoggingAdapter]))
+      eventually {
+        verify(telegramApiTest).sendMessage(exact(send))(any(classOf[ActorContext]),
+          any(classOf[LoggingAdapter]))
+      }
     }
   }
 
