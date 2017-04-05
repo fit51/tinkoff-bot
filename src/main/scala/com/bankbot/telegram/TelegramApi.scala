@@ -1,44 +1,74 @@
 package com.bankbot.telegram
 
+import akka.actor.{ActorContext, ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
-import akka.http.scaladsl.HttpExt
+import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
-import akka.stream.ActorMaterializer
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.unmarshalling.Unmarshal
+import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import com.bankbot.CommonTypes._
-import com.bankbot.Main
+import com.bankbot.telegram.TelegramTypes.ServerAnswer
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
 
 /**
   * Class that handles httpRequests to Telegram Api
   * @constructor creates a new Api class for Actor
   */
-class TelegramApi(http: HttpExt, materializer: ActorMaterializer, log: LoggingAdapter,
-                  dispatcher: ExecutionContextExecutor) extends MessageMarshallingTelegram {
-  implicit val ec = dispatcher
-  final implicit val mat = materializer
+trait TelegramApi extends TelegramKey {
+  def getUpdates(offset: Int)(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit
+  def sendMessage(params: Map[String, String])(implicit context: ActorContext, logger: LoggingAdapter): Unit
+}
 
-  val url = "https://api.telegram.org/bot" + Main.token
+class TelegramApiImpl(implicit system: ActorSystem)
+  extends TelegramApi with MessageMarshallingTelegram {
 
-  def getUpdates(offset: Int): Future[HttpResponse] = {
+  final val url = "https://api.telegram.org/bot" + token
+  lazy val http = Http(system)
+  implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system))
+
+  def getUpdates(offset: Int)(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+    import akka.pattern.pipe
+    import context.dispatcher
+
     val params = Map("offset" -> offset.toString)
     val uri = Uri(url + "/getUpdates").withQuery(Query(params))
-    http.singleRequest(HttpRequest(uri = uri))(materializer)
+    val response = http.singleRequest(HttpRequest(uri = uri))
+    (response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        logger.debug("Telegram getUpdates Request Success")
+        Unmarshal(entity).to[ServerAnswer]
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Telegram getUpdates Request failed, response code: " + code)
+        throw ResponceCodeException("Telegram getUpdates Responce code:", entity)
+      }
+    } recover {
+      case _ => ServerAnswer(false, Array())
+    }).pipeTo(self)
   }
 
-  def sendMessage(params: Map[String, String]): Future[HttpEntity] = {
+  @throws(classOf[IllegalArgumentException])
+  def sendMessage(params: Map[String, String])(implicit context: ActorContext, logger: LoggingAdapter): Unit = {
+    import context.dispatcher
+    require(params.keySet("chat_id") && params.keySet("text"))
+
     val uri = Uri(url + "/sendMessage").withQuery(Query(params))
-    val response = http.singleRequest(HttpRequest(uri = uri))(materializer)
+    val response = http.singleRequest(HttpRequest(uri = uri))
     response map {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
-        log.info("Telegram sendMessage Request Success")
+        logger.info("Telegram sendMessage Request Success")
         entity
       }
       case HttpResponse(code, _, entity, _) => {
-        log.info("Telegram sendMessage Request failed, response code: " + code)
-        throw ResponceCodeException("Tinkoff Responce code:", entity)
+        logger.info("Telegram sendMessage Request failed, response code: " + code)
+        throw ResponceCodeException("Telegram sendMessage Responce code:", entity)
       }
+    } onComplete {
+      case Success(_) => logger.info("Reply successfully send to " + params("chat_id"))
+      case Failure(t) => logger.info("Reply send failed: " + t.getMessage + " to " + params("chat_id"))
     }
   }
 

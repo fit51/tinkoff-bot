@@ -11,8 +11,6 @@ import telegram.TelegramTypes._
 object SessionManager {
   def props = Props(new SessionManager())
 
-  // контакты складываются сюда
-  var contacts: List[Contact] = List()
 }
 
 class SessionManager extends Actor with ActorLogging {
@@ -21,7 +19,7 @@ class SessionManager extends Actor with ActorLogging {
     context.actorOf(UserSession.props(chat), chat.id.toString)
 
   override def receive: Receive = {
-    case Message(message_id: Int, from: User, chat: Chat, date: Int, text: Option[String], contact: Option[Contact]) => {
+    case Message(message_id: Int, from: User, chat: Chat, date: Int, text: Option[String]) => {
 
     }
   }
