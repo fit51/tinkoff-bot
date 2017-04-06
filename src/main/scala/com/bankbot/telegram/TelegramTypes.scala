@@ -12,13 +12,13 @@ object TelegramTypes {
 
   case class ReplyKeyboardMarkup(keyboard: Array[Array[KeyboardButton]], resize_keyboard: Boolean, one_time_keyboard: Boolean)
 
-  case class Contact(phone_number: String, first_name: String, last_name: String, user_id: Int)
+  case class Contact(phone_number: String, first_name: String, last_name: Option[String], user_id: Int)
 
-  case class User(id: Int, first_name: String, last_name: String, username: Option[String])
+  case class User(id: Int, first_name: String, last_name: Option[String], username: Option[String])
 
   case class Chat(id: Int, c_type: String)
 
-  case class Message(message_id: Int, from: User, chat: Chat, date: Int, text: Option[String], contact: Option[Contact])
+  case class Message(message_id: Int, from: Option[User], chat: Chat, date: Int, text: Option[String], contact: Option[Contact])
 
   case class Update(update_id: Int, message: Message)
 

@@ -28,30 +28,25 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
   def receive = {
     case ServerAnswer(true, result) => {
       for (update <- result) {
-        // - Пока не понимаю, как убрать это отсюда,
-        // - т.к. сообщение от пользователя после нажатия кнопки
-        // - прилетит сюда.
-        if (update.message.contact.nonEmpty) {
-          if (!SessionManager.contacts.contains(update.message.from)) {
-            sessionManager ! update.message
+        update.message.contact match {
+          case Some(contact) => {
+            sessionManager ! SessionManager.PossibleContact(update.message)
           }
+          case None =>
         }
         update.message.text match {
           // - Если кто-то пытается пользоваться без авторизации,
           // - то ему придёт кнопка отправки контакта.
-          case Some(s) if s == "/balance" || s == "/history" &&
-            !SessionManager.contacts.contains(update.message.from) => {
-            sessionManager ! SessionManager.ContactRequest(update.message)
-          }
           case Some(s) if s == "/rates" || s == "/r" => {
             // – для получения курсов
             noSessionActions ! NoSessionActions.SendRates(update.message)
           }
-          case Some(s) if s == "/balance" || s == "/b" &&
-            SessionManager.contacts.contains(update.message.from) => {
+          case Some(s) if s == "/balance" || s == "/b"  => {
             // – для получения текущих балансов
-//            sessionManager ! SessionManager.SendBalance(update.message)
+            sessionManager ! SessionManager.SendBalance(update.message)
+//            noSessionActions ! NoSessionActions.Reply(update.message, "Your balance: -1")
           }
+
           case Some(s) if s == "/history" || s == "/hi" => {
             // – для истории операций
             noSessionActions ! NoSessionActions.Reply(update.message, "Not implemented yet")
@@ -64,6 +59,8 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
             log.info("Got undefined command: " + s)
             noSessionActions ! NoSessionActions.Reply(update.message, "No Such Command\nSee /help")
           }
+          case None =>
+
         }
         offset = update.update_id + 1
       }

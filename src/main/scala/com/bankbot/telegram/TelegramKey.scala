@@ -9,4 +9,5 @@ trait TelegramKey {
 
   val token = ConfigFactory.load("telegram").getString("telegram.key")
 
+
 }

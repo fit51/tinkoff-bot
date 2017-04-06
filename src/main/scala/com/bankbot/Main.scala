@@ -16,6 +16,6 @@ object Main extends App {
   val telegramApi = new TelegramApiImpl
   lazy val noSessionActions: ActorRef = system.actorOf(
     NoSessionActions.props(system.scheduler, conf.getInt("app.updateRatesInterval"), telegramApi, tinkoffApi))
-  val sessionManager = system.actorOf(SessionManager.props)
+  val sessionManager = system.actorOf(SessionManager.props(telegramApi, tinkoffApi))
   val getUpdates = system.actorOf(TelegramUpdater.props(sessionManager, noSessionActions, telegramApi))
 }
