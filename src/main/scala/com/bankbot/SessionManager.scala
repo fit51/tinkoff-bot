@@ -13,7 +13,8 @@ import telegram.TelegramApi
   */
 
 object SessionManager {
-  def props(telegramApi: TelegramApi, tinkoffApi: TinkoffApi) = Props(classOf[SessionManager], telegramApi, tinkoffApi)
+  def props(telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =
+    Props(classOf[SessionManager], telegramApi, tinkoffApi)
 
   case class ContactRequest(m: Message)
   case class PossibleContact(m: Message)
@@ -31,21 +32,19 @@ class SessionManager(telegramApi: TelegramApi,
   def getContacts = contacts
 
   override def receive: Receive = {
-    case Message(message_id: Int, from: Option[User], chat: Chat, date: Int, text: Option[String], contact: Option[Contact]) => {
-      if (contact.nonEmpty) {
-        // - User has already shared the contact
-        if (contacts.contains(from.get.id)) {
-          val send = Map("chat_id" -> chat.id.toString,
-            "text" -> "Already in the contact list", "parse_mode" -> "HTML")
-          telegramApi.sendMessage(send)
-        } else {
+    case Message(_, Some(from), chat, _, _, Some(contact)) if contacts.contains(from.id) => {
+      // - User has already shared the contact
+      val send = Map("chat_id" -> chat.id.toString,
+        "text" -> "Already in the contact list", "parse_mode" -> "HTML")
+      telegramApi.sendMessage(send)
+    }
+
+    case Message(_, Some(from), chat, _, _, Some(contact)) => {
         // - Otherwise
-          contacts += (from.get.id -> contact.get)
+          contacts += (from.id -> contact)
           val send = Map("chat_id" -> chat.id.toString,
             "text" -> "Thanks for sharing your contact!", "parse_mode" -> "HTML")
           telegramApi.sendMessage(send)
-        }
-      }
     }
 
     case SendBalance(message) => {
@@ -72,19 +71,11 @@ class SessionManager(telegramApi: TelegramApi,
       }
     }
 
-    case ContactRequest(message) => {
-      if (!contacts.contains(message.from.get.id)) {
+    case ContactRequest(message) if !contacts.contains(message.from.get.id) => {
         val messageText = "This operation requires your phone number."
         val send = Map("chat_id" -> message.chat.id.toString, "text" -> messageText,
           "reply_markup" -> "{\"keyboard\":[[{\"text\":\"Send number\", \"request_contact\": true}]]}")
         telegramApi.sendMessage(send)
-      } else {
-
       }
-    }
-
-    case Message(message_id: Int, from: Option[User], chat: Chat, date: Int, text: Option[String], _) => {
-
-    }
   }
 }

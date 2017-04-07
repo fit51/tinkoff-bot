@@ -22,7 +22,7 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
   import TelegramUpdater._
   implicit val logger: LoggingAdapter = log
 
-  var offset = 0
+  private var offset = 0
   override def preStart(): Unit = telegramApi.getUpdates(offset)
 
   def receive = {
@@ -67,6 +67,5 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
       telegramApi.getUpdates(offset)
     }
     case ServerAnswer(false, _) => telegramApi.getUpdates(offset)
-    case getOffset => sender ! Offset(offset)
   }
 }
