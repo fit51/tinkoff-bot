@@ -32,9 +32,9 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
 
   val tinkoffApiTest = mock[TinkoffApi]
   val telegramApiTest = mock[TelegramApi]
-  val testUser = User(321, "", "", "")
+  val testUser = User(321, "", Some(""), Some(""))
   val testChat = Chat(123, "private")
-  val testMessage = Message(0, testUser, testChat, 0, None)
+  val testMessage = Message(0, Some(testUser), testChat, 0, None, None)
   val rateNew = Rate("", Currency(0, "USD"), Currency(0, "RUB"), 58.2f, 56.7f)
 
   val time = new VirtualTime

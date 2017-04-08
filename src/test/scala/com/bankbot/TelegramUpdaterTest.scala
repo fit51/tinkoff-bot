@@ -3,10 +3,11 @@ package com.bankbot
 import akka.actor.{ActorContext, ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import com.bankbot.SessionManager.{PossibleContact, SendBalance}
 import com.bankbot.telegram.TelegramApi
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
-import org.mockito.Mockito.{ verify, times => ts}
+import org.mockito.Mockito.{verify, times => ts}
 import org.mockito.Matchers._
 import org.scalatest.{Matchers, WordSpecLike}
 
@@ -32,10 +33,10 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
       TelegramUpdater.props(sessionManagerTest.ref, noSessionActionsTest.ref, telegramApiTest)
     )
   val testChat = Chat(1, "private")
-  val testUser = User(1, "Name", "LastName", "Login")
-  val testMessage = Message(1, testUser, testChat, 123, Some("/bla"))
+  val testUser = User(1, "Name", Some("LastName"), Some("Login"))
+  val testMessage = Message(1, Some(testUser), testChat, 123, Some("/bla"), None)
   val testUpdate = Update(2, testMessage)
-
+  val testContact = Contact("999999", "Oleg", None, 1)
 
   "Telegram Updater" must {
     "call getUpdates on Start and after every ServerAnswer" in {
@@ -61,10 +62,17 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
       noSessionActionsTest.expectMsg(Reply(testMessage, "No Such Command\nSee /help"))
     }
     "on /rates forward message to NoSessionActions" in {
-      val ratesMessage = Message(1, testUser, testChat, 123, Some("/rates"))
+      val ratesMessage = Message(1, Some(testUser), testChat, 123, Some("/rates"), None)
       val ratesServerAnswer = ServerAnswer(true, Array(Update(11, ratesMessage)))
       telegramUpdaterTest ! ratesServerAnswer
       noSessionActionsTest.expectMsg(SendRates(ratesMessage))
     }
+    "send PossibleContact message to SessionManager when update contains contact" in {
+      val contactMessage = Message(1, Some(testUser), testChat, 123, None, Some(testContact))
+      val contactServerAnswer = ServerAnswer(true, Array(Update(11, contactMessage)))
+      telegramUpdaterTest ! contactServerAnswer
+      sessionManagerTest.expectMsg(PossibleContact(contactMessage))
+    }
+
   }
 }
