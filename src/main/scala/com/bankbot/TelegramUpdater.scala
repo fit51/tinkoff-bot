@@ -3,7 +3,7 @@ package com.bankbot
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingAdapter
 import com.bankbot.telegram.TelegramApi
-import telegram.TelegramTypes.ServerAnswer
+import telegram.TelegramTypes.{Message, ServerAnswer}
 
 /**
   * Actor that gets Telegram Updates
@@ -28,39 +28,37 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
   def receive = {
     case ServerAnswer(true, result) => {
       for (update <- result) {
-        update.message.contact match {
-          case Some(contact) => {
+        update.message match {
+          case Message(_, _, _, _, _, Some(contact)) => {
             sessionManager ! SessionManager.PossibleContact(update.message)
           }
-          case None =>
-        }
-        update.message.text match {
-          // - Если кто-то пытается пользоваться без авторизации,
-          // - то ему придёт кнопка отправки контакта.
-          case Some(s) if s == "/rates" || s == "/r" => {
-            // – для получения курсов
-            noSessionActions ! NoSessionActions.SendRates(update.message)
+          case Message(_, _, _, _, Some(text), None) => {
+            text match {
+              // - Если кто-то пытается пользоваться без авторизации,
+              // - то ему придёт кнопка отправки контакта.
+              case s if s == "/rates" || s == "/r" => {
+                // – для получения курсов
+                noSessionActions ! NoSessionActions.SendRates(update.message)
+              }
+              case s if s == "/balance" || s == "/b"  => {
+                // – для получения текущих балансов
+                sessionManager ! SessionManager.SendBalance(update.message)
+                //            noSessionActions ! NoSessionActions.Reply(update.message, "Your balance: -1")
+              }
+              case s if s == "/history" || s == "/hi" => {
+                // – для истории операций
+                noSessionActions ! NoSessionActions.Reply(update.message, "Not implemented yet")
+              }
+              case s if s == "/help" || s == "/h" => {
+                // -  справочник доступных функций
+                noSessionActions ! NoSessionActions.Reply(update.message, "Not implemented yet")
+              }
+              case s => {
+                //            log.info("Got undefined command: " + s)
+                noSessionActions ! NoSessionActions.Reply(update.message, "No Such Command\nSee /help")
+              }
+            }
           }
-          case Some(s) if s == "/balance" || s == "/b"  => {
-            // – для получения текущих балансов
-            sessionManager ! SessionManager.SendBalance(update.message)
-//            noSessionActions ! NoSessionActions.Reply(update.message, "Your balance: -1")
-          }
-
-          case Some(s) if s == "/history" || s == "/hi" => {
-            // – для истории операций
-            noSessionActions ! NoSessionActions.Reply(update.message, "Not implemented yet")
-          }
-          case Some(s) if s == "/help" || s == "/h" => {
-            // -  справочник доступных функций
-            noSessionActions ! NoSessionActions.Reply(update.message, "Not implemented yet")
-          }
-          case Some(s) => {
-            log.info("Got undefined command: " + s)
-            noSessionActions ! NoSessionActions.Reply(update.message, "No Such Command\nSee /help")
-          }
-          case None =>
-
         }
         offset = update.update_id + 1
       }

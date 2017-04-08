@@ -32,20 +32,6 @@ class SessionManager(telegramApi: TelegramApi,
   def getContacts = contacts
 
   override def receive: Receive = {
-    case Message(_, Some(from), chat, _, _, Some(contact)) if contacts.contains(from.id) => {
-      // - User has already shared the contact
-      val send = Map("chat_id" -> chat.id.toString,
-        "text" -> "Already in the contact list", "parse_mode" -> "HTML")
-      telegramApi.sendMessage(send)
-    }
-
-    case Message(_, Some(from), chat, _, _, Some(contact)) => {
-        // - Otherwise
-          contacts += (from.id -> contact)
-          val send = Map("chat_id" -> chat.id.toString,
-            "text" -> "Thanks for sharing your contact!", "parse_mode" -> "HTML")
-          telegramApi.sendMessage(send)
-    }
 
     case SendBalance(message) => {
       if (!contacts.contains(message.from.get.id)) {
@@ -67,7 +53,10 @@ class SessionManager(telegramApi: TelegramApi,
           "text" -> "Already got your contact!", "parse_mode" -> "HTML")
         telegramApi.sendMessage(send)
       } else {
-        self ! message
+        contacts += (message.from.get.id -> message.contact.get)
+        val send = Map("chat_id" -> message.chat.id.toString,
+          "text" -> "Thanks for sharing your contact!", "parse_mode" -> "HTML")
+        telegramApi.sendMessage(send)
       }
     }
 

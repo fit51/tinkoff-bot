@@ -67,11 +67,12 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
       telegramUpdaterTest ! ratesServerAnswer
       noSessionActionsTest.expectMsg(SendRates(ratesMessage))
     }
-    "on /balance with " in {
-      val balanceMessage = Message(1, Some(testUser), testChat, 123, Some("/balance"), Some(testContact))
-      val balanceServerAnswer = ServerAnswer(true, Array(Update(11, balanceMessage)))
-      telegramUpdaterTest ! balanceServerAnswer
-      sessionManagerTest.expectMsg(PossibleContact(balanceMessage))
+    "send PossibleContact message to SessionManager when update contains contact" in {
+      val contactMessage = Message(1, Some(testUser), testChat, 123, None, Some(testContact))
+      val contactServerAnswer = ServerAnswer(true, Array(Update(11, contactMessage)))
+      telegramUpdaterTest ! contactServerAnswer
+      sessionManagerTest.expectMsg(PossibleContact(contactMessage))
     }
+
   }
 }
