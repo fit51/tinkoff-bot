@@ -25,8 +25,8 @@ object PrettyMessage {
   }
 
   def prettyHelp() =
-    """"<b>Hi there!</b>
-      |I am a bot that implements some functionality of Tinkoff Internet Banking.
+    """<b>Hi there!</b>
+      |I am a bot that implements some functionality of Tinkoff Internet Bank.
       |You can control me with this commands:
       |/rates - get Currency Rates
       |/balance - get your Balance
@@ -36,12 +36,12 @@ object PrettyMessage {
     """.stripMargin
 
   def prettyNonPrivate() =
-    """"<b>Sorry!</b>
+    """<b>Sorry!</b>
       |This bot support only <b>private</b> chats.
     """.stripMargin
 
   def prettyThx4Contact() =
-    """"Thanks for sharing your contact!
+    """Thanks for sharing your contact!
       |Now you can use this commands:
       |/balance - get your Balance
       |/history - get yor history

@@ -41,7 +41,7 @@ class SessionManagerTest extends TestKit(ActorSystem("testBotSystem"))
   "SessionManager" must {
     "send a message about sharing the contact when sent SendBalance and" +
       " the user is not in the contact list" in {
-      sessionManager ! SessionManager.SessionCommand(testMessage1)
+      sessionManager ! SessionManager.BalanceCommand(testUser1, testChat.id)
       val messageText = "This operation requires your phone number."
       val reply_markup = "{\"keyboard\":[[{\"text\":\"Send My Phone Number\", \"request_contact\": true}]], " +
         "\"resize_keyboard\": true, \"one_time_keyboard\": true}"
@@ -64,7 +64,7 @@ class SessionManagerTest extends TestKit(ActorSystem("testBotSystem"))
     }
 
     "send a message \"Your balance is: 0\" if the user is in the contact list" in {
-      sessionManager ! SessionManager.SessionCommand(testMessage2)
+      sessionManager ! SessionManager.BalanceCommand(testUser2, testChat.id)
       val send = Map("chat_id" -> testMessage2.chat.id.toString,
         "text" -> "Your balance is: 0", "parse_mode" -> "HTML")
       eventually {

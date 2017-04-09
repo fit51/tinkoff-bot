@@ -3,7 +3,7 @@ package com.bankbot
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingAdapter
 import com.bankbot.telegram.TelegramApi
-import com.bankbot.telegram.PrettyMessage.prettyHelp
+import com.bankbot.telegram.PrettyMessage.{prettyHelp, prettyNonPrivate}
 import telegram.TelegramTypes.{Message, ServerAnswer}
 
 /**
@@ -31,29 +31,33 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
       for (update <- result) {
         if(update.message.chat.c_type == "private") {
           update.message match {
-            case Message(_, _, _, _, Some(text), None) => {
+            case Message(_, Some(user), chat, _, Some(text), None) => {
               text match {
                 // - Если кто-то пытается пользоваться без авторизации,
                 // - то ему придёт кнопка отправки контакта.
                 case s if s == "/rates" || s == "/r" => {
                   // – для получения курсов
-                  noSessionActions ! NoSessionActions.SendRates(update.message)
+                  noSessionActions ! NoSessionActions.SendRates(chat.id)
                 }
-                case s if isSessionCommand(s) => {
+                case s if s == "/balance" || s == "/b" => {
                   // – команды, которые требую аутентификации
-                  sessionManager ! SessionManager.SessionCommand(update.message)
+                  sessionManager ! SessionManager.BalanceCommand(user, chat.id)
+                }
+                case s if s == "/history" || s == "/hi" => {
+                  // – команды, которые требую аутентификации
+                  sessionManager ! SessionManager.HistoryCommand(user, chat.id)
                 }
                 case s if s == "/help" || s == "/h" => {
                   // -  справочник доступных функций
-                  noSessionActions ! NoSessionActions.Reply(update.message, prettyHelp)
+                  noSessionActions ! NoSessionActions.Reply(chat.id, prettyHelp)
                 }
                 case s if s == "/start" || s == "/s" => {
                   // -  сообщение при старте
-                  noSessionActions ! NoSessionActions.Reply(update.message, prettyHelp)
+                  noSessionActions ! NoSessionActions.Reply(chat.id, prettyHelp)
                 }
                 case s => {
                   //            log.info("Got undefined command: " + s)
-                  noSessionActions ! NoSessionActions.Reply(update.message, "No Such Command\nSee /help")
+                  noSessionActions ! NoSessionActions.Reply(chat.id, "No Such Command\nSee /help")
                 }
               }
             }
@@ -62,7 +66,7 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
             }
           }
         } else {
-          noSessionActions ! NoSessionActions.Reply(update.message, prettyHelp)
+          noSessionActions ! NoSessionActions.Reply(update.message.chat.id, prettyNonPrivate)
         }
         offset = update.update_id + 1
       }
@@ -72,8 +76,4 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
     case getOffset => sender ! Offset(offset)
   }
 
-  def isSessionCommand(text: String) = {
-    text == "/balance" || text == "/b" ||
-      text == "/history" || text == "/hi"
-  }
 }

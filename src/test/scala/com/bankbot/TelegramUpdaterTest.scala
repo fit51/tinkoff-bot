@@ -3,7 +3,7 @@ package com.bankbot
 import akka.actor.{ActorContext, ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import com.bankbot.SessionManager.{PossibleContact, SendBalance}
+import com.bankbot.SessionManager.PossibleContact
 import com.bankbot.telegram.TelegramApi
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
@@ -59,13 +59,13 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
     "on unknown command reply to User See help via noSessionActions" in {
       val okServerAnswer = ServerAnswer(true, Array(testUpdate))
       telegramUpdaterTest ! okServerAnswer
-      noSessionActionsTest.expectMsg(Reply(testMessage, "No Such Command\nSee /help"))
+      noSessionActionsTest.expectMsg(Reply(testChat.id, "No Such Command\nSee /help"))
     }
     "on /rates forward message to NoSessionActions" in {
       val ratesMessage = Message(1, Some(testUser), testChat, 123, Some("/rates"), None)
       val ratesServerAnswer = ServerAnswer(true, Array(Update(11, ratesMessage)))
       telegramUpdaterTest ! ratesServerAnswer
-      noSessionActionsTest.expectMsg(SendRates(ratesMessage))
+      noSessionActionsTest.expectMsg(SendRates(testChat.id))
     }
     "send PossibleContact message to SessionManager when update contains contact" in {
       val contactMessage = Message(1, Some(testUser), testChat, 123, None, Some(testContact))

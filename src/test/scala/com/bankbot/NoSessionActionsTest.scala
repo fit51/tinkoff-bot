@@ -60,7 +60,7 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
       expectMsg(Vector(rateNew))
     }
     "send Rates to telegram chat when requested" in {
-      noSessionActions ! SendRates(testMessage)
+      noSessionActions ! SendRates(testChat.id)
       val send = Map("chat_id" -> testChat.id.toString,
         "text" -> PrettyMessage.prettyRates(
           Instant.ofEpochMilli(2L), Vector(rateNew), ZoneId.of("Europe/Moscow")
@@ -72,7 +72,7 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
     }
     "send reply to Telegram Message when requested" in {
       val testText = "test text"
-      noSessionActions ! Reply(testMessage, testText)
+      noSessionActions ! Reply(testChat.id, testText)
       val send = Map("chat_id" -> testChat.id.toString,
         "text" -> testText, "parse_mode" -> "HTML")
       eventually {

@@ -23,9 +23,9 @@ object NoSessionActions {
   )
 
   case object GetRates
-  case class SendRates(m: Message)
+  case class SendRates(chatId: Int)
   case object UpdateRates
-  case class Reply(m: Message, text: String)
+  case class Reply(chatId: Int, text: String)
 }
 
 class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramApi: TelegramApi,
@@ -56,16 +56,16 @@ class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramA
       }
     }
 
-    case SendRates(message: Message) => {
-          val send = Map("chat_id" -> message.chat.id.toString,
+    case SendRates(chatId: Int) => {
+          val send = Map("chat_id" -> chatId.toString,
             "text" -> PrettyMessage.prettyRates(
               last_update, rates, ZoneId.of("Europe/Moscow")
             ), "parse_mode" -> "HTML")
           telegramApi.sendMessage(send)
     }
 
-    case Reply(message: Message, text) => {
-      val send = Map("chat_id" -> message.chat.id.toString,
+    case Reply(chatId, text) => {
+      val send = Map("chat_id" -> chatId.toString,
         "text" -> text, "parse_mode" -> "HTML")
       telegramApi.sendMessage(send)
     }
