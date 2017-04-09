@@ -24,4 +24,26 @@ object PrettyMessage {
       }).mkString("")
   }
 
+  def prettyHelp() =
+    """"<b>Hi there!</b>
+      |I am a bot that implements some functionality of Tinkoff Internet Banking.
+      |You can control me with this commands:
+      |/rates - get Currency Rates
+      |/balance - get your Balance
+      |/history - get yor history
+      |/help - see this message again
+      |Note that balance and history require sharing your phone number.
+    """.stripMargin
+
+  def prettyNonPrivate() =
+    """"<b>Sorry!</b>
+      |This bot support only <b>private</b> chats.
+    """.stripMargin
+
+  def prettyThx4Contact() =
+    """"Thanks for sharing your contact!
+      |Now you can use this commands:
+      |/balance - get your Balance
+      |/history - get yor history
+    """.stripMargin
 }

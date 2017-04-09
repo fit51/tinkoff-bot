@@ -1,10 +1,10 @@
 package com.bankbot
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingAdapter
-import com.bankbot.SessionManager.{ContactRequest, PossibleContact, SendBalance}
 import com.bankbot.tinkoff.TinkoffApi
 import telegram.TelegramTypes._
+import telegram.PrettyMessage.prettyThx4Contact
 import telegram.TelegramApi
 
 /**
@@ -17,28 +17,27 @@ object SessionManager {
     Props(classOf[SessionManager], telegramApi, tinkoffApi)
 
   case class ContactRequest(m: Message)
-  case class PossibleContact(m: Message)
-  case class SendBalance(m: Message)
+  case class PossibleContact(chat_id: Int, contact: Contact)
+  case class SessionCommand(m: Message)
 }
 
 class SessionManager(telegramApi: TelegramApi,
                      tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
+  import com.bankbot.SessionManager._
   implicit val logger: LoggingAdapter = log
-  var contacts: Map[Int, Contact] = Map()
+  type UserId = Int
+
+  var contacts: Map[UserId, Contact] = Map()
+  var sessions: Map[UserId, ActorRef] = Map()
 
   def createUserSession(chat: Chat) =
     context.actorOf(UserSession.props(chat), chat.id.toString)
 
-  def getContacts = contacts
-
   override def receive: Receive = {
 
-    case SendBalance(message) => {
+    case SessionCommand(message) => {
       if (!contacts.contains(message.from.get.id)) {
-        val send = Map("chat_id" -> message.chat.id.toString,
-          "text" -> "You have to share your contact first. Then request balance again!", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
-        self ! ContactRequest(message)
+        contactRequest(message)
       } else {
         // - for now
         val send = Map("chat_id" -> message.chat.id.toString,
@@ -47,24 +46,20 @@ class SessionManager(telegramApi: TelegramApi,
       }
     }
 
-    case PossibleContact(message) => {
-      if (contacts.contains(message.from.get.id)) {
-        val send = Map("chat_id" -> message.chat.id.toString,
-          "text" -> "Already got your contact!", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
-      } else {
-        contacts += (message.from.get.id -> message.contact.get)
-        val send = Map("chat_id" -> message.chat.id.toString,
-          "text" -> "Thanks for sharing your contact!", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
-      }
+    case PossibleContact(chat_id: Int, contact: Contact) => {
+      contacts += (contact.user_id -> contact)
+      val send = Map("chat_id" -> chat_id.toString,
+        "text" -> prettyThx4Contact, "parse_mode" -> "HTML")
+      telegramApi.sendMessage(send)
     }
+  }
 
-    case ContactRequest(message) if !contacts.contains(message.from.get.id) => {
-        val messageText = "This operation requires your phone number."
-        val send = Map("chat_id" -> message.chat.id.toString, "text" -> messageText,
-          "reply_markup" -> "{\"keyboard\":[[{\"text\":\"Send number\", \"request_contact\": true}]]}")
-        telegramApi.sendMessage(send)
-      }
+  def contactRequest(message: Message) = {
+    val messageText = "This operation requires your phone number."
+    val reply_markup = "{\"keyboard\":[[{\"text\":\"Send My Phone Number\", \"request_contact\": true}]], " +
+      "\"resize_keyboard\": true, \"one_time_keyboard\": true}"
+    val send = Map("chat_id" -> message.chat.id.toString, "text" -> messageText,
+      "reply_markup" -> reply_markup)
+    telegramApi.sendMessage(send)
   }
 }

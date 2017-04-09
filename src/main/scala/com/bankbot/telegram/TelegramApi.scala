@@ -50,10 +50,9 @@ class TelegramApiImpl(implicit system: ActorSystem)
     }).pipeTo(self)
   }
 
-  @throws(classOf[IllegalArgumentException])
+  //require(params.keySet("chat_id") && params.keySet("text"))
   def sendMessage(params: Map[String, String])(implicit context: ActorContext, logger: LoggingAdapter): Unit = {
     import context.dispatcher
-    require(params.keySet("chat_id") && params.keySet("text"))
 
     val uri = Uri(url + "/sendMessage").withQuery(Query(params))
     val response = http.singleRequest(HttpRequest(uri = uri))

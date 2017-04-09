@@ -71,7 +71,7 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
       val contactMessage = Message(1, Some(testUser), testChat, 123, None, Some(testContact))
       val contactServerAnswer = ServerAnswer(true, Array(Update(11, contactMessage)))
       telegramUpdaterTest ! contactServerAnswer
-      sessionManagerTest.expectMsg(PossibleContact(contactMessage))
+      sessionManagerTest.expectMsg(PossibleContact(contactMessage.chat.id, testContact))
     }
 
   }
