@@ -12,9 +12,9 @@ object Main extends App {
   val conf = ConfigFactory.load()
   implicit val system = ActorSystem("BotSystem")
 
-  val tinkoffApi = new TinkoffApiImpl(noSessionActions)
+  val tinkoffApi = new TinkoffApiImpl
   val telegramApi = new TelegramApiImpl
-  lazy val noSessionActions: ActorRef = system.actorOf(
+  val noSessionActions: ActorRef = system.actorOf(
     NoSessionActions.props(system.scheduler, conf.getInt("app.updateRatesInterval"), telegramApi, tinkoffApi))
   val sessionManager = system.actorOf(SessionManager.props(telegramApi, tinkoffApi))
   val getUpdates = system.actorOf(TelegramUpdater.props(sessionManager, noSessionActions, telegramApi))

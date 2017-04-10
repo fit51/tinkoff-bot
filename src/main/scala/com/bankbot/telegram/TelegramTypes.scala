@@ -18,7 +18,11 @@ object TelegramTypes {
 
   case class Chat(id: Int, c_type: String)
 
-  case class Message(message_id: Int, from: Option[User], chat: Chat, date: Int, text: Option[String], contact: Option[Contact])
+  case class ReplyMessage(message_id: Int, from: Option[User], chat: Chat, date: Int,
+                          text: Option[String], contact: Option[Contact])
+
+  case class Message(message_id: Int, from: Option[User], chat: Chat, date: Int, reply_to_message: Option[ReplyMessage],
+                     text: Option[String], contact: Option[Contact])
 
   case class Update(update_id: Int, message: Message)
 
@@ -39,7 +43,8 @@ trait MessageMarshallingTelegram extends DefaultJsonProtocol {
   implicit val contactFormat = jsonFormat4(Contact)
   implicit val userFormat = jsonFormat4(User)
   implicit val chatFormat = jsonFormat(Chat, "id", "type")
-  implicit val messageFormat = jsonFormat6(Message)
+  implicit val replyMessageFormat = jsonFormat6(ReplyMessage)
+  implicit val messageFormat = jsonFormat7(Message)
   implicit val updateFormat = jsonFormat2(Update)
   implicit val serverAnswerFormat = jsonFormat2(ServerAnswer)
 

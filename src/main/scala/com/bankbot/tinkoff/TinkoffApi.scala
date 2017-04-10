@@ -8,6 +8,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import TinkoffTypes._
 import akka.actor.{ActorContext, ActorRef, ActorSystem}
+import akka.http.scaladsl.model.Uri.Query
 import com.bankbot.CommonTypes._
 
 /**
@@ -17,17 +18,28 @@ import com.bankbot.CommonTypes._
 
 
 trait TinkoffApi {
-  def getRates()(implicit context: ActorContext, logger: LoggingAdapter)
+  def getRates()(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
+
+  def getSession()(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
+
+  def signUp(sessionid: String, phone: String)
+            (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
+
+  def confirm(sessionid: String, initialOperationTicket: String, confirmationData: String)
+             (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
+
+  def levelUp(sessionid: String)
+             (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
 }
 
-class TinkoffApiImpl(processingActor: => ActorRef)(implicit system: ActorSystem)
+class TinkoffApiImpl(implicit system: ActorSystem)
   extends TinkoffApi with MessageMarshallingTinkoff {
 
   final val url = "https://www.tinkoff.ru/api/v1/"
   lazy val http = Http(system)
   implicit val materializer = ActorMaterializer(ActorMaterializerSettings(system))
 
-  def getRates()(implicit context: ActorContext, logger: LoggingAdapter): Unit = {
+  def getRates()(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
     import akka.pattern.pipe
     import context.dispatcher
 
@@ -44,8 +56,105 @@ class TinkoffApiImpl(processingActor: => ActorRef)(implicit system: ActorSystem)
         logger.warning("Tinkoff getRates Request failed, response code: " + code)
         throw ResponceCodeException("Tinkoff Responce code:", entity)
       }
-    }).pipeTo(processingActor)
+    }).pipeTo(self)
   }
 
+  def getSession()(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+    import akka.pattern.pipe
+    import context.dispatcher
+
+    val params = Map("origin" -> "web,ib5,platform")
+    val uri = Uri(url + "/session").withQuery(Query(params))
+    val response = http.singleRequest(HttpRequest(uri = uri))
+    (response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        logger.debug("Tinkoff getSession Request Success")
+        Unmarshal(entity).to[Session] map { s =>
+          if(s.resultCode != "OK")
+            throw ResponceCodeException("get Session Result code: " + s.resultCode, entity)
+          else
+            s
+        }
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Tinkoff get Session Request failed, response code: " + code)
+        throw ResponceCodeException("Tinkoff Responce code:", entity)
+      }
+    }).pipeTo(self)
+  }
+
+  def signUp(sessionid: String, phone: String)
+            (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+    import akka.pattern.pipe
+    import context.dispatcher
+
+    val params = Map("sessionid" -> sessionid, "origin" -> "web,ib5,platform")
+    val uri = Uri(url + "/sign_up").withQuery(Query(params))
+    val form = FormData(("phone", phone)).toEntity
+    val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri, entity = form))
+    (response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        logger.debug("Tinkoff signUp Request Success")
+        Unmarshal(entity).to[SignUp] map { s =>
+          if(s.resultCode != "WAITING_CONFIRMATION" || s.confirmations.head != "SMSBYID")
+            throw ResponceCodeException("signUp Result code: " + s.resultCode, entity)
+          else
+            s
+        }
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Tinkoff signUp Request failed, response code: " + code)
+        throw ResponceCodeException("Tinkoff Responce code:", entity)
+      }
+    }).pipeTo(self)
+  }
+
+  def confirm(sessionid: String, initialOperationTicket: String, confirmationData: String)
+            (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+    import akka.pattern.pipe
+    import context.dispatcher
+
+    val params = Map("sessionid" -> sessionid, "origin" -> "web,ib5,platform")
+    val uri = Uri(url + "/confirm").withQuery(Query(params))
+    val form = FormData(
+      ("initialOperationTicket", initialOperationTicket),
+      ("initialOperation", "sign_up"),
+      ("confirmationData", confirmationData)).toEntity
+    val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri, entity = form))
+    (response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        logger.debug("Tinkoff confirm Request Success")
+        Unmarshal(entity).to[Confirm]      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Tinkoff confirm Request failed, response code: " + code)
+        throw ResponceCodeException("Tinkoff Responce code:", entity)
+      }
+    }).pipeTo(self)
+  }
+
+  def levelUp(sessionid: String)
+            (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+    import akka.pattern.pipe
+    import context.dispatcher
+
+    val params = Map("sessionid" -> sessionid, "origin" -> "web,ib5,platform")
+    val uri = Uri(url + "/level_up").withQuery(Query(params))
+    val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri))
+    (response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        logger.debug("Tinkoff levelUp Request Success")
+        Unmarshal(entity).to[LevelUp] map { s =>
+          if(s.resultCode != "OK")
+            throw ResponceCodeException("levelUp Result code: " + s.resultCode, entity)
+          else
+            s.payload
+        }
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Tinkoff levelUp Request failed, response code: " + code)
+        throw ResponceCodeException("Tinkoff Responce code:", entity)
+      }
+    }).pipeTo(self)
+  }
 
 }

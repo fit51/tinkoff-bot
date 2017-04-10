@@ -2,7 +2,7 @@ package com.bankbot
 
 import java.time.{Instant, ZoneId}
 
-import akka.actor.{ActorContext, ActorSystem}
+import akka.actor.{ActorContext, ActorRef, ActorSystem}
 import akka.event.LoggingAdapter
 import akka.testkit.{ImplicitSender, TestKit}
 import com.bankbot.NoSessionActions._
@@ -13,7 +13,7 @@ import com.bankbot.tinkoff.TinkoffTypes.{Currency, Rate}
 import com.miguno.akka.testing.VirtualTime
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.concurrent.Eventually
-import org.mockito.Mockito.{ verify, times => ts}
+import org.mockito.Mockito.{verify, times => ts}
 import org.mockito.Matchers.{eq => exact, _}
 import org.scalatest.{Matchers, WordSpecLike}
 
@@ -34,7 +34,7 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
   val telegramApiTest = mock[TelegramApi]
   val testUser = User(321, "", Some(""), Some(""))
   val testChat = Chat(123, "private")
-  val testMessage = Message(0, Some(testUser), testChat, 0, None, None)
+  val testMessage = Message(0, Some(testUser), testChat, 0, None, None, None)
   val rateNew = Rate("", Currency(0, "USD"), Currency(0, "RUB"), 58.2f, 56.7f)
 
   val time = new VirtualTime
@@ -46,7 +46,10 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
       time.advance(5 second)
       time.elapsed shouldBe (6 second)
       eventually {
-        verify(tinkoffApiTest, ts(3)).getRates()(any(classOf[ActorContext]), any(classOf[LoggingAdapter]))
+        verify(tinkoffApiTest, ts(3)).getRates()(any(classOf[ActorContext]),
+          any(classOf[LoggingAdapter]),
+          any(classOf[ActorRef]
+          ))
       }
     }
     "set newest Rates when it receives a ServerAnswer" in {
@@ -72,7 +75,7 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
     }
     "send reply to Telegram Message when requested" in {
       val testText = "test text"
-      noSessionActions ! Reply(testChat.id, testText)
+      noSessionActions ! SendMessage(testChat.id, testText)
       val send = Map("chat_id" -> testChat.id.toString,
         "text" -> testText, "parse_mode" -> "HTML")
       eventually {

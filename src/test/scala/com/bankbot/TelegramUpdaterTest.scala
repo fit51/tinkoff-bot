@@ -34,7 +34,7 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
     )
   val testChat = Chat(1, "private")
   val testUser = User(1, "Name", Some("LastName"), Some("Login"))
-  val testMessage = Message(1, Some(testUser), testChat, 123, Some("/bla"), None)
+  val testMessage = Message(1, Some(testUser), testChat, 123, None, Some("/bla"), None)
   val testUpdate = Update(2, testMessage)
   val testContact = Contact("999999", "Oleg", None, 1)
 
@@ -52,23 +52,23 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
       expectMsg(Offset(0))
       val withOffsetServerAnswer = ServerAnswer(true, Array(Update(1, testMessage)))
       telegramUpdaterTest ! withOffsetServerAnswer
-      noSessionActionsTest.expectMsgClass(classOf[Reply])
+      noSessionActionsTest.expectMsgClass(classOf[SendMessage])
       telegramUpdaterTest ! getOffset
       expectMsg(Offset(2))
     }
     "on unknown command reply to User See help via noSessionActions" in {
       val okServerAnswer = ServerAnswer(true, Array(testUpdate))
       telegramUpdaterTest ! okServerAnswer
-      noSessionActionsTest.expectMsg(Reply(testChat.id, "No Such Command\nSee /help"))
+      noSessionActionsTest.expectMsg(SendMessage(testChat.id, "No Such Command\nSee /help"))
     }
     "on /rates forward message to NoSessionActions" in {
-      val ratesMessage = Message(1, Some(testUser), testChat, 123, Some("/rates"), None)
+      val ratesMessage = Message(1, Some(testUser), testChat, 123, None, Some("/rates"), None)
       val ratesServerAnswer = ServerAnswer(true, Array(Update(11, ratesMessage)))
       telegramUpdaterTest ! ratesServerAnswer
       noSessionActionsTest.expectMsg(SendRates(testChat.id))
     }
     "send PossibleContact message to SessionManager when update contains contact" in {
-      val contactMessage = Message(1, Some(testUser), testChat, 123, None, Some(testContact))
+      val contactMessage = Message(1, Some(testUser), testChat, 123, None, None, Some(testContact))
       val contactServerAnswer = ServerAnswer(true, Array(Update(11, contactMessage)))
       telegramUpdaterTest ! contactServerAnswer
       sessionManagerTest.expectMsg(PossibleContact(contactMessage.chat.id, testContact))

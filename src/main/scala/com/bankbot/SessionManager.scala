@@ -1,7 +1,8 @@
 package com.bankbot
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, Props, Terminated}
 import akka.event.LoggingAdapter
+import com.bankbot.UserSession.Reply
 import com.bankbot.tinkoff.TinkoffApi
 import telegram.TelegramTypes._
 import telegram.PrettyMessage.prettyThx4Contact
@@ -17,26 +18,21 @@ object SessionManager {
     Props(classOf[SessionManager], telegramApi, tinkoffApi)
 
   case class PossibleContact(chatId: Int, contact: Contact)
-  abstract class SessionCommand {
-    val from: User
-    val chatId: Int
-  }
-  case class BalanceCommand(override val from: User, override val chatId: Int) extends SessionCommand
-  case class HistoryCommand(override val from: User, override val chatId: Int) extends SessionCommand
+  case class PossibleReply(chatId: Int, messageId: Int, text: String)
+  case class WaitForReply(chatId: Int, messageId: Int)
 }
 
 class SessionManager(telegramApi: TelegramApi,
                      tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
   import com.bankbot.SessionManager._
+  import UserSession.SessionCommand
   implicit val logger: LoggingAdapter = log
   type UserId = Int
   type ChatId = Int
+  type MessageId = Int
 
-  var contacts: Map[UserId, Contact] = Map()
-  var sessions: Map[ChatId, ActorRef] = Map()
-
-  def createUserSession(chat: Chat) =
-    context.actorOf(UserSession.props(chat), chat.id.toString)
+  private var contacts: Map[UserId, Contact] = Map()
+  private var awatingReply: Set[(ChatId, MessageId)] = Set()
 
   override def receive: Receive = {
 
@@ -44,11 +40,27 @@ class SessionManager(telegramApi: TelegramApi,
       if (!contacts.contains(command.from.id)) {
         contactRequest(command.chatId)
       } else {
-
-        val send = Map("chat_id" -> command.chatId.toString,
-          "text" -> "Your balance is: 0", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
+        val name = command.chatId.toString
+        def create() = {
+          val userSession = context.actorOf(
+            UserSession.props(
+              command.chatId, contacts(command.from.id), command, telegramApi, tinkoffApi), name
+          )
+          userSession forward command
+        }
+        context.child(name). fold(create)(_ forward command)
       }
+    }
+
+    case PossibleReply(chatId, messageId, text) => {
+      if (awatingReply((chatId, messageId))) {
+        context.child(chatId.toString) foreach { _ ! Reply(messageId, text) }
+        awatingReply -= ((chatId, messageId))
+      }
+    }
+
+    case WaitForReply(chatId, messageId) => {
+      awatingReply += ((chatId, messageId))
     }
 
     case PossibleContact(chatId: Int, contact: Contact) => {
@@ -57,6 +69,7 @@ class SessionManager(telegramApi: TelegramApi,
         "text" -> prettyThx4Contact, "parse_mode" -> "HTML")
       telegramApi.sendMessage(send)
     }
+
   }
 
   def contactRequest(chatId: Int) = {

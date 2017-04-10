@@ -4,11 +4,9 @@ import java.time.{Instant, ZoneId}
 
 import akka.actor.{Actor, ActorLogging, Props, Scheduler}
 import akka.event.LoggingAdapter
-import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import com.bankbot.tinkoff.TinkoffApi
 
 import scala.concurrent.duration._
-import telegram.TelegramTypes.Message
 import telegram.{PrettyMessage, TelegramApi}
 import tinkoff.TinkoffTypes.{Rate, ServerAnswer}
 
@@ -19,13 +17,13 @@ import tinkoff.TinkoffTypes.{Rate, ServerAnswer}
 
 object NoSessionActions {
   def props(scheduler: Scheduler, updateRatesInterval: Int, telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =  Props(
-    classOf[NoSessionActions], scheduler: Scheduler, updateRatesInterval, telegramApi, tinkoffApi
+    classOf[NoSessionActions], scheduler, updateRatesInterval, telegramApi, tinkoffApi
   )
 
   case object GetRates
   case class SendRates(chatId: Int)
   case object UpdateRates
-  case class Reply(chatId: Int, text: String)
+  case class SendMessage(chatId: Int, text: String)
 }
 
 class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramApi: TelegramApi,
@@ -64,7 +62,7 @@ class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramA
           telegramApi.sendMessage(send)
     }
 
-    case Reply(chatId, text) => {
+    case SendMessage(chatId, text) => {
       val send = Map("chat_id" -> chatId.toString,
         "text" -> text, "parse_mode" -> "HTML")
       telegramApi.sendMessage(send)

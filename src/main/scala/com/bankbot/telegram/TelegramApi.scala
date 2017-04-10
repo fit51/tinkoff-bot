@@ -9,8 +9,9 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import com.bankbot.CommonTypes._
-import com.bankbot.telegram.TelegramTypes.ServerAnswer
+import com.bankbot.telegram.TelegramTypes.{Message, ServerAnswer}
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
@@ -20,6 +21,8 @@ import scala.util.{Failure, Success}
 trait TelegramApi extends TelegramKey {
   def getUpdates(offset: Int)(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit
   def sendMessage(params: Map[String, String])(implicit context: ActorContext, logger: LoggingAdapter): Unit
+  def sendReplyMessage(params: Map[String, String])
+                      (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[Message]
 }
 
 class TelegramApiImpl(implicit system: ActorSystem)
@@ -68,6 +71,24 @@ class TelegramApiImpl(implicit system: ActorSystem)
     } onComplete {
       case Success(_) => logger.info("Reply successfully send to " + params("chat_id"))
       case Failure(t) => logger.info("Reply send failed: " + t.getMessage + " to " + params("chat_id"))
+    }
+  }
+
+  def sendReplyMessage(params: Map[String, String])
+                      (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[Message] = {
+    import context.dispatcher
+
+    val uri = Uri(url + "/sendMessage").withQuery(Query(params))
+    val response = http.singleRequest(HttpRequest(uri = uri))
+    response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        logger.info("Telegram sendMessage Request Success")
+        Unmarshal(entity).to[Message]
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.info("Telegram sendMessage Request failed, response code: " + code)
+        throw ResponceCodeException("Telegram sendMessage Responce code:", entity)
+      }
     }
   }
 
