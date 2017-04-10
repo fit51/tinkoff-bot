@@ -61,11 +61,11 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       else
         requestSMSId("SMS Code must contain only Digits. Try again:")
     }
-    case Confirm("OK", Some(userId), Some(payload)) => {
+    case Confirm("OK", Some(payload)) => {
       session = payload.sessionid
       tinkoffApi.levelUp(session)
     }
-    case Confirm(resultCode, _, _) => resultCode match {
+    case Confirm(resultCode, _) => resultCode match {
       case "CONFIRMATION_FAILED" => requestSMSId("SMS confirmation code is wrong. Try again:")
       case _ => internalError("Internal Error.\n Try again Later")
     }
@@ -80,12 +80,12 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
   }
 
   def registered: Receive = {
-    case BalanceCommand => {
+    case m: BalanceCommand => {
       val send = Map("chat_id" -> chatId.toString,
         "text" -> "Your balance is: 0", "parse_mode" -> "HTML")
       telegramApi.sendMessage(send)
     }
-    case HistoryCommand => {
+    case m: HistoryCommand => {
       val send = Map("chat_id" -> chatId.toString,
         "text" -> "Your have no history", "parse_mode" -> "HTML")
       telegramApi.sendMessage(send)
@@ -104,8 +104,8 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     val force_reply = """{"force_reply": true}"""
     val send = Map("chat_id" -> chatId.toString, "text" -> messageText,
       "reply_markup" -> force_reply)
-    telegramApi.sendReplyMessage(send).onSuccess {
-      case m => context.parent ! WaitForReply(m.chat.id, m.message_id)
+    telegramApi.sendReplyMessage(send) onSuccess {
+      case ServerAnswerReply(_, m) => context.parent ! WaitForReply(m.chat.id, m.message_id)
     }
   }
 

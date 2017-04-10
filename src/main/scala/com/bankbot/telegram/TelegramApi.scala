@@ -9,7 +9,7 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import com.bankbot.CommonTypes._
-import com.bankbot.telegram.TelegramTypes.{Message, ServerAnswer}
+import com.bankbot.telegram.TelegramTypes.{Message, ServerAnswer, ServerAnswerReply}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -19,10 +19,12 @@ import scala.util.{Failure, Success}
   * @constructor creates a new Api class for Actor
   */
 trait TelegramApi extends TelegramKey {
-  def getUpdates(offset: Int)(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit
-  def sendMessage(params: Map[String, String])(implicit context: ActorContext, logger: LoggingAdapter): Unit
+  def getUpdates(offset: Int)(implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
+  def sendMessage(params: Map[String, String])(implicit context: ActorContext, logger: LoggingAdapter)
   def sendReplyMessage(params: Map[String, String])
-                      (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[Message]
+                      (
+                        implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef
+                      ): Future[ServerAnswerReply]
 }
 
 class TelegramApiImpl(implicit system: ActorSystem)
@@ -69,13 +71,15 @@ class TelegramApiImpl(implicit system: ActorSystem)
         throw ResponceCodeException("Telegram sendMessage Responce code:", entity)
       }
     } onComplete {
-      case Success(_) => logger.info("Reply successfully send to " + params("chat_id"))
-      case Failure(t) => logger.info("Reply send failed: " + t.getMessage + " to " + params("chat_id"))
+      case Success(_) => logger.info("Message successfully send to " + params("chat_id"))
+      case Failure(t) => logger.info("Message send failed: " + t.getMessage + " to " + params("chat_id"))
     }
   }
 
   def sendReplyMessage(params: Map[String, String])
-                      (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[Message] = {
+                      (
+                        implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef
+                      ): Future[ServerAnswerReply] = {
     import context.dispatcher
 
     val uri = Uri(url + "/sendMessage").withQuery(Query(params))
@@ -83,7 +87,7 @@ class TelegramApiImpl(implicit system: ActorSystem)
     response flatMap {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
         logger.info("Telegram sendMessage Request Success")
-        Unmarshal(entity).to[Message]
+        Unmarshal(entity).to[ServerAnswerReply]
       }
       case HttpResponse(code, _, entity, _) => {
         logger.info("Telegram sendMessage Request failed, response code: " + code)

@@ -28,6 +28,8 @@ object TelegramTypes {
 
   case class ServerAnswer(ok: Boolean, result: Array[Update])
 
+  case class ServerAnswerReply(ok: Boolean, result: ReplyMessage)
+
 }
 
 /**
@@ -47,5 +49,6 @@ trait MessageMarshallingTelegram extends DefaultJsonProtocol {
   implicit val messageFormat = jsonFormat7(Message)
   implicit val updateFormat = jsonFormat2(Update)
   implicit val serverAnswerFormat = jsonFormat2(ServerAnswer)
+  implicit val serverAnswerReplyFormat = jsonFormat2(ServerAnswerReply)
 
 }

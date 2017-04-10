@@ -10,6 +10,7 @@ import TinkoffTypes._
 import akka.actor.{ActorContext, ActorRef, ActorSystem}
 import akka.http.scaladsl.model.Uri.Query
 import com.bankbot.CommonTypes._
+import spray.json._
 
 /**
   * Class that handles httpRequests to Tinkoff Api
@@ -119,7 +120,7 @@ class TinkoffApiImpl(implicit system: ActorSystem)
     val form = FormData(
       ("initialOperationTicket", initialOperationTicket),
       ("initialOperation", "sign_up"),
-      ("confirmationData", confirmationData)).toEntity
+      ("confirmationData", Confirmation(confirmationData).toJson.toString())).toEntity(HttpCharsets.`UTF-8`)
     val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri, entity = form))
     (response flatMap {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
@@ -133,7 +134,7 @@ class TinkoffApiImpl(implicit system: ActorSystem)
   }
 
   def levelUp(sessionid: String)
-            (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+  (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
     import akka.pattern.pipe
     import context.dispatcher
 
@@ -152,6 +153,25 @@ class TinkoffApiImpl(implicit system: ActorSystem)
       }
       case HttpResponse(code, _, entity, _) => {
         logger.warning("Tinkoff levelUp Request failed, response code: " + code)
+        throw ResponceCodeException("Tinkoff Responce code:", entity)
+      }
+    }).pipeTo(self)
+  }
+
+  def warmup_cache(sessionid: String)
+             (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+    import akka.pattern.pipe
+    import context.dispatcher
+
+    val params = Map("warmup_cache" -> sessionid, "origin" -> "web,ib5,platform")
+    val uri = Uri(url + "/level_up").withQuery(Query(params))
+    val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri))
+    (response map {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        logger.debug("Tinkoff warmup_cache Request Success")
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Tinkoff warmup_cache Request failed, response code: " + code)
         throw ResponceCodeException("Tinkoff Responce code:", entity)
       }
     }).pipeTo(self)
