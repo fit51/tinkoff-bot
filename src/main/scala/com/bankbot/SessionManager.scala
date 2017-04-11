@@ -1,6 +1,6 @@
 package com.bankbot
 
-import akka.actor.{Actor, ActorLogging, Props, Terminated}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingAdapter
 import com.bankbot.UserSession.Reply
 import com.bankbot.tinkoff.TinkoffApi
@@ -42,12 +42,7 @@ class SessionManager(telegramApi: TelegramApi,
       } else {
         val name = command.chatId.toString
         def create() = {
-          val userSession = context.actorOf(
-            UserSession.props(
-              command.chatId, contacts(command.from.id), command, telegramApi, tinkoffApi, context.system.scheduler
-            ),
-            name
-          )
+          val userSession = createUserSession(name, command)
           userSession forward command
         }
         context.child(name). fold(create)(_ forward command)
@@ -72,6 +67,15 @@ class SessionManager(telegramApi: TelegramApi,
       telegramApi.sendMessage(send)
     }
 
+  }
+
+  def createUserSession(name: String, command: SessionCommand): ActorRef = {
+    context.actorOf(
+      UserSession.props(
+        command.chatId, contacts(command.from.id), command, telegramApi, tinkoffApi, context.system.scheduler
+      ),
+      name
+    )
   }
 
   def contactRequest(chatId: Int) = {

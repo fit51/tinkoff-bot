@@ -1,8 +1,9 @@
 package com.bankbot
 
-import akka.actor.{ActorContext, ActorSystem}
+import akka.actor.{ActorContext, ActorRef, ActorSystem, Props}
 import akka.event.LoggingAdapter
-import akka.testkit.{ImplicitSender, TestKit}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import com.bankbot.UserSession.SessionCommand
 import com.bankbot.telegram.TelegramApi
 import com.bankbot.telegram.TelegramTypes.{Chat, Contact, Message, User}
 import com.bankbot.tinkoff.TinkoffApi
@@ -10,7 +11,7 @@ import org.mockito.Matchers.any
 import org.scalatest.{Matchers, WordSpecLike}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mockito.MockitoSugar
-import org.mockito.Mockito.{ verify, times => ts}
+import org.mockito.Mockito.{verify, times => ts}
 import org.mockito.Matchers.{eq => exact}
 import telegram.PrettyMessage.prettyThx4Contact
 
@@ -35,8 +36,12 @@ class SessionManagerTest extends TestKit(ActorSystem("testBotSystem"))
   val testMessage1 = Message(0, Some(testUser1), testChat, 0, None, None, None)
   val testMessage2 = Message(1, Some(testUser2), testChat, 0, None, None, Some(testContact2))
 
-  val sessionManager = system.actorOf(SessionManager.props(telegramApiTest, tinkoffApiTest))
-//  sessionManager.asInstanceOf[SessionManager].contacts += (2 -> testContact2)
+  val testUserSession = TestProbe(testChat.id.toString)
+  val sessionManager = system.actorOf(Props(
+    new SessionManager(telegramApiTest, tinkoffApiTest) {
+      override def createUserSession(name: String, command: SessionCommand): ActorRef = testUserSession.ref
+    }
+  ))
 
   "SessionManager" must {
     "send a message about sharing the contact when sent SendBalance and" +
@@ -63,14 +68,10 @@ class SessionManagerTest extends TestKit(ActorSystem("testBotSystem"))
       }
     }
 
-    "send a message \"Your balance is: 0\" if the user is in the contact list" in {
-//      sessionManager ! UserSession.BalanceCommand(testUser2, testChat.id)
-//      val send = Map("chat_id" -> testMessage2.chat.id.toString,
-//        "text" -> "Your balance is: 0", "parse_mode" -> "HTML")
-//      eventually {
-//        verify(telegramApiTest).sendMessage(exact(send))(any(classOf[ActorContext]),
-//          any(classOf[LoggingAdapter]))
-//      }
+    "create UserSession and forward message if the user is in the contact list" in {
+      val command = UserSession.BalanceCommand(testUser2, testChat.id)
+      sessionManager ! command
+      testUserSession.expectMsg(command)
     }
   }
 

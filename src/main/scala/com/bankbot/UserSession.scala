@@ -31,6 +31,7 @@ object UserSession {
   case class HistoryCommand(override val from: User, override val chatId: Int) extends SessionCommand
   case class Reply(messageId: Int, text: String)
   case object WarmUpSession
+  case object GetAccessLevel
 }
 
 class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionCommand, telegramApi: TelegramApi,
@@ -95,6 +96,8 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       }
       case _ => informUser("Internal Error.\n Try again Later")
     }
+
+    case GetAccessLevel => sender ! "REGISTERING"
   }
 
   def registered: Receive = {
@@ -131,6 +134,7 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       tinkoffApi.warmupCache(session)
       tinkoffApi.sessionStatus(session)
     }
+    case GetAccessLevel => sender ! "REGISTERED"
   }
 
   def processAccounts(f: (AccountsFlat) => String) = {
