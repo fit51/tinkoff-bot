@@ -1,6 +1,6 @@
 package com.bankbot
 
-import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
+import akka.actor.{Actor, ActorLogging, PoisonPill, Props, Scheduler}
 import akka.event.LoggingAdapter
 import com.bankbot.UserSession.SessionCommand
 import com.bankbot.telegram.TelegramApi
@@ -8,6 +8,10 @@ import com.bankbot.tinkoff.TinkoffApi
 import com.bankbot.telegram.TelegramTypes._
 import com.bankbot.tinkoff.TinkoffTypes._
 import com.bankbot.SessionManager.WaitForReply
+import telegram.PrettyMessage.prettyBalance
+
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 /**
   * Actor that authenticates and handles commands for single user
@@ -16,8 +20,8 @@ import com.bankbot.SessionManager.WaitForReply
 
 object UserSession {
   def props(chatId: Int, contact: Contact, initialCommand: SessionCommand, telegramApi: TelegramApi,
-            tinkoffApi: TinkoffApi) = Props(
-    classOf[UserSession], chatId, contact, initialCommand, telegramApi, tinkoffApi
+            tinkoffApi: TinkoffApi, scheduler: Scheduler) = Props(
+    classOf[UserSession], chatId, contact, initialCommand, telegramApi, tinkoffApi, scheduler
   )
   abstract class SessionCommand {
     val from: User
@@ -26,19 +30,29 @@ object UserSession {
   case class BalanceCommand(override val from: User, override val chatId: Int) extends SessionCommand
   case class HistoryCommand(override val from: User, override val chatId: Int) extends SessionCommand
   case class Reply(messageId: Int, text: String)
+  case object WarmUpSession
 }
 
-class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionCommand,
-                  telegramApi: TelegramApi, tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
+class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionCommand, telegramApi: TelegramApi,
+                  tinkoffApi: TinkoffApi, scheduler: Scheduler) extends Actor with ActorLogging {
   import UserSession._
   import context.dispatcher
   implicit val logger: LoggingAdapter = log
 
   var session: String = ""
   var operationTicket = ""
+  var accessLevel = "REGISTERING"
+  var poisonTick = scheduler.scheduleOnce(5 minutes, self, PoisonPill)
 
   override def preStart() = {
     tinkoffApi.getSession()
+  }
+
+  override def postStop() = {
+    if(accessLevel == "REGISTERED") {
+      log.info(s"User session $session is Over!")
+      informUser("Your session is Over")
+    }
   }
 
   override def receive: Receive = registering
@@ -56,6 +70,7 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       requestSMSId("Enter SMS Confirmation Code")
     }
     case Reply(messageId, smsId) => {
+      restartPoisonTick
       if(smsId forall(_.isDigit))
         tinkoffApi.confirm(session, operationTicket, smsId)
       else
@@ -67,36 +82,78 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     }
     case Confirm(resultCode, _) => resultCode match {
       case "CONFIRMATION_FAILED" => requestSMSId("SMS confirmation code is wrong. Try again:")
-      case _ => internalError("Internal Error.\n Try again Later")
+      case _ => informUser("Internal Error.\n Try again Later")
     }
 
-    case AccessLevel(level) => level match {
-      case "REGISTERED" => {
+    case LevelUp(resultCode, AccessLevel(level)) => (resultCode, level) match {
+      case ("OK", "REGISTERED") => {
+        accessLevel = level
+        log.info(s"User with session $session registered!")
         context.become(registered)
         self ! initialCommand
+        self ! WarmUpSession
       }
-      case _ => internalError("Internal Error.\n Try again Later")
+      case _ => informUser("Internal Error.\n Try again Later")
     }
   }
 
   def registered: Receive = {
     case m: BalanceCommand => {
-      val send = Map("chat_id" -> chatId.toString,
-        "text" -> "Your balance is: 0", "parse_mode" -> "HTML")
-      telegramApi.sendMessage(send)
+      restartPoisonTick
+      val showBalance = (ac: AccountsFlat) => ac match {
+        case AccountsFlat(_, Some(payload)) => {
+          payload.map( ac => {
+            prettyBalance(ac.name, ac.accountType, ac.moneyAmount)
+          }).mkString("\n")
+        }
+        case _ => "Your have no balance"
+      }
+      processAccounts(showBalance)
     }
     case m: HistoryCommand => {
-      val send = Map("chat_id" -> chatId.toString,
-        "text" -> "Your have no history", "parse_mode" -> "HTML")
-      telegramApi.sendMessage(send)
+      restartPoisonTick
+      val showHistory = (ac: AccountsFlat) => {
+        "Your have no history"
+      }
+      processAccounts(showHistory)
+    }
+    case SessionStatus("OK", Some(payload), _) => {
+      log.info(s"SessinStatus OK")
+      val nextWarmUp = payload.millisLeft/2
+      scheduler.scheduleOnce(nextWarmUp millis, self, WarmUpSession)
+    }
+    case SessionStatus(resultCode, _, Some(errorMessage)) => {
+      log.info(s"$session : $errorMessage")
+      self ! PoisonPill
+    }
+    case WarmUpSession => {
+      log.info("WarmUp!")
+      tinkoffApi.warmupCache(session)
+      tinkoffApi.sessionStatus(session)
     }
   }
 
-  def internalError(text: String) = {
+  def processAccounts(f: (AccountsFlat) => String) = {
+    tinkoffApi.accountsFlat(session).onComplete {
+      case Success(acFlat) => informUser(f(acFlat))
+      case Failure(t) => {
+        val send = Map("chat_id" -> chatId.toString,
+          "text" -> "Your have no Accounts", "parse_mode" -> "HTML")
+        telegramApi.sendMessage(send)
+        logger.info("Getting Accounts Flat failed!: " + t.getMessage)
+      }
+    }
+  }
+
+  def restartPoisonTick() = {
+    poisonTick.cancel()
+    poisonTick = scheduler.scheduleOnce(5 minutes, self, PoisonPill)
+  }
+
+  def informUser(text: String) = {
     val send = Map("chat_id" -> chatId.toString,
       "text" -> text, "parse_mode" -> "HTML")
     telegramApi.sendMessage(send)
-    self ! PoisonPill
   }
 
   def requestSMSId(text: String) = {

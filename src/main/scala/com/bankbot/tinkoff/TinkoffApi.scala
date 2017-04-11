@@ -12,6 +12,9 @@ import akka.http.scaladsl.model.Uri.Query
 import com.bankbot.CommonTypes._
 import spray.json._
 
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
+
 /**
   * Class that handles httpRequests to Tinkoff Api
   * @constructor creates a new Api class for Actor
@@ -31,6 +34,14 @@ trait TinkoffApi {
 
   def levelUp(sessionid: String)
              (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
+
+  def warmupCache(sessionid: String)(implicit context: ActorContext, logger: LoggingAdapter)
+
+  def sessionStatus(sessionid: String)
+                   (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef)
+
+  def accountsFlat(sessionid: String)
+                  (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[AccountsFlat]
 }
 
 class TinkoffApiImpl(implicit system: ActorSystem)
@@ -143,13 +154,7 @@ class TinkoffApiImpl(implicit system: ActorSystem)
     val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri))
     (response flatMap {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
-        logger.debug("Tinkoff levelUp Request Success")
-        Unmarshal(entity).to[LevelUp] map { s =>
-          if(s.resultCode != "OK")
-            throw ResponceCodeException("levelUp Result code: " + s.resultCode, entity)
-          else
-            s.payload
-        }
+        Unmarshal(entity).to[LevelUp]
       }
       case HttpResponse(code, _, entity, _) => {
         logger.warning("Tinkoff levelUp Request failed, response code: " + code)
@@ -158,23 +163,64 @@ class TinkoffApiImpl(implicit system: ActorSystem)
     }).pipeTo(self)
   }
 
-  def warmup_cache(sessionid: String)
-             (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
+  def warmupCache(sessionid: String)(implicit context: ActorContext, logger: LoggingAdapter): Unit = {
+    import context.dispatcher
+
+    val params = Map("sessionid" -> sessionid, "origin" -> "web,ib5,platform")
+    val uri = Uri(url + "/warmup_cache").withQuery(Query(params))
+    val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri))
+    response map {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        Unmarshal(entity).to[WarmUp] map { w =>
+          if(w.resultCode != "OK")
+            throw ResponceCodeException("warmup_cache Result code: " + w.resultCode, entity)
+        }
+      }
+      case HttpResponse(code, _, entity, _) => {
+        throw ResponceCodeException("warmup_cache Responce code:", entity)
+      }
+    } onComplete {
+      case Success(_) => logger.info("Tinkoff warmup_cache Request Success")
+      case Failure(t) => logger.info("Tinkoff warmup_cache Request failed: " + t.getMessage)
+    }
+  }
+
+  def sessionStatus(sessionid: String)
+                  (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Unit = {
     import akka.pattern.pipe
     import context.dispatcher
 
-    val params = Map("warmup_cache" -> sessionid, "origin" -> "web,ib5,platform")
-    val uri = Uri(url + "/level_up").withQuery(Query(params))
+    val params = Map("sessionid" -> sessionid, "origin" -> "web,ib5,platform")
+    val uri = Uri(url + "/session_status").withQuery(Query(params))
     val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri))
-    (response map {
+    (response flatMap {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
-        logger.debug("Tinkoff warmup_cache Request Success")
+        Unmarshal(entity).to[SessionStatus]
       }
       case HttpResponse(code, _, entity, _) => {
-        logger.warning("Tinkoff warmup_cache Request failed, response code: " + code)
+        logger.warning("Tinkoff session_status Request failed, response code: " + code)
         throw ResponceCodeException("Tinkoff Responce code:", entity)
       }
     }).pipeTo(self)
+  }
+
+  def accountsFlat(sessionid: String)
+                   (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[AccountsFlat] = {
+    import akka.pattern.pipe
+    import context.dispatcher
+
+    val params = Map("sessionid" -> sessionid)
+    val uri = Uri(url + "/accounts_flat").withQuery(Query(params))
+    val response = http.singleRequest(HttpRequest(uri = uri))
+    response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        Unmarshal(entity).to[AccountsFlat]
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Tinkoff session_status Request failed, response code: " + code)
+        throw ResponceCodeException("Tinkoff Responce code:", entity)
+      }
+    }
   }
 
 }

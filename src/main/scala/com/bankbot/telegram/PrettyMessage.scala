@@ -3,7 +3,7 @@ package com.bankbot.telegram
 import java.time.{Instant, ZoneId}
 import java.time.format.DateTimeFormatter
 
-import com.bankbot.tinkoff.TinkoffTypes.Rate
+import com.bankbot.tinkoff.TinkoffTypes.{Balance, Rate}
 
 /**
   * Object provides methods to Create Strings for Telegram Messages with HTML parse_mode
@@ -46,4 +46,11 @@ object PrettyMessage {
       |/balance - get your Balance
       |/history - get yor history
     """.stripMargin
+
+  def prettyBalance(name: String, accountType: String, accountBalance: Balance) = {
+    s"<b>$name</b>\n" +
+    s"<b>Type:</b> $accountType\n" +
+      s"<b>Balance:</b>\n ${accountBalance.value}\t${accountBalance.currency.name}"
+  }
+
 }

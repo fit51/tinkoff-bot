@@ -33,6 +33,18 @@ object TinkoffTypes {
 
   case class Confirmation(SMSBYID: String)
 
+  case class WarmUp(resultCode: String)
+
+  case class SessionStatusPayLoad(accessLevel: String, millisLeft: Int, userId: String, additionalAuth: AdditionalAuth)
+
+  case class SessionStatus(resultCode: String, payload: Option[SessionStatusPayLoad], errorMessage: Option[String])
+
+  case class Balance(currency: Currency, value: Int)
+
+  case class Account(name: String, moneyAmount: Balance, accountType: String)
+
+  case class AccountsFlat(resultCode: String, payload: Option[Vector[Account]])
+
 }
 
 /**
@@ -53,6 +65,12 @@ trait MessageMarshallingTinkoff extends DefaultJsonProtocol {
   implicit val accessLevelFormat = jsonFormat1(AccessLevel)
   implicit val levelUpFormat = jsonFormat2(LevelUp)
   implicit val confirmationFormat = jsonFormat1(Confirmation)
+  implicit val warmUpFormat = jsonFormat1(WarmUp)
+  implicit val sessionStatusPayLoadFormat = jsonFormat4(SessionStatusPayLoad)
+  implicit val sessionStatusFormat = jsonFormat3(SessionStatus)
+  implicit val balanceFormat = jsonFormat2(Balance)
+  implicit val accountFormat = jsonFormat3(Account)
+  implicit val accountsFlatFormat = jsonFormat2(AccountsFlat)
 
   implicit object ServerAnswerJsonFormat extends RootJsonFormat[ServerAnswer] {
 

@@ -44,7 +44,9 @@ class SessionManager(telegramApi: TelegramApi,
         def create() = {
           val userSession = context.actorOf(
             UserSession.props(
-              command.chatId, contacts(command.from.id), command, telegramApi, tinkoffApi), name
+              command.chatId, contacts(command.from.id), command, telegramApi, tinkoffApi, context.system.scheduler
+            ),
+            name
           )
           userSession forward command
         }
