@@ -131,7 +131,7 @@ class TinkoffApiImpl(implicit system: ActorSystem)
     val form = FormData(
       ("initialOperationTicket", initialOperationTicket),
       ("initialOperation", "sign_up"),
-      ("confirmationData", Confirmation(confirmationData).toJson.toString())).toEntity(HttpCharsets.`UTF-8`)
+      ("confirmationData", Confirmation(confirmationData).toJson.compactPrint)).toEntity(HttpCharsets.`UTF-8`)
     val response = http.singleRequest(HttpRequest(HttpMethods.POST, uri, entity = form))
     (response flatMap {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
@@ -206,7 +206,6 @@ class TinkoffApiImpl(implicit system: ActorSystem)
 
   def accountsFlat(sessionid: String)
                    (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[AccountsFlat] = {
-    import akka.pattern.pipe
     import context.dispatcher
 
     val params = Map("sessionid" -> sessionid)
