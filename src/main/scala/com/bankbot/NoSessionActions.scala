@@ -4,6 +4,7 @@ import java.time.{Instant, ZoneId}
 
 import akka.actor.{Actor, ActorLogging, Props, Scheduler}
 import akka.event.LoggingAdapter
+import com.bankbot.telegram.TelegramTypes.TelegramMessage
 import com.bankbot.tinkoff.TinkoffApi
 
 import scala.concurrent.duration._
@@ -55,17 +56,15 @@ class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramA
     }
 
     case SendRates(chatId: Int) => {
-          val send = Map("chat_id" -> chatId.toString,
-            "text" -> PrettyMessage.prettyRates(
-              last_update, rates, ZoneId.of("Europe/Moscow")
-            ), "parse_mode" -> "HTML")
-          telegramApi.sendMessage(send)
+      val message = TelegramMessage(chatId, PrettyMessage.prettyRates(
+        last_update, rates, ZoneId.of("Europe/Moscow")
+      ))
+      telegramApi.sendMessage(message)
     }
 
     case SendMessage(chatId, text) => {
-      val send = Map("chat_id" -> chatId.toString,
-        "text" -> text, "parse_mode" -> "HTML")
-      telegramApi.sendMessage(send)
+      val message = TelegramMessage(chatId, text)
+      telegramApi.sendMessage(message)
     }
   }
 

@@ -87,7 +87,7 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
         UserSession.props(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler)
       )
       w(telegramApiTest.sendReplyMessage(
-        any(classOf[Map[String, String]]))(
+        any(classOf[TelegramMessage]))(
         any(classOf[ActorContext]), any(classOf[LoggingAdapter]), any(classOf[ActorRef]
         ))).thenReturn(
         Future(ServerAnswerReply(true, testReplyMessage))
@@ -95,7 +95,7 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
       userSession ! testSignUp
       eventually {
         verify(telegramApiTest).sendReplyMessage(
-          any(classOf[Map[String, String]]))(
+          any(classOf[TelegramMessage]))(
           any(classOf[ActorContext]), any(classOf[LoggingAdapter]), any(classOf[ActorRef]
           ))
       }

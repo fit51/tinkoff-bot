@@ -150,9 +150,7 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     tinkoffApi.accountsFlat(session).onComplete {
       case Success(acFlat) => informUser(f(acFlat))
       case Failure(t) => {
-        val send = Map("chat_id" -> chatId.toString,
-          "text" -> "You have no Accounts", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
+        informUser("Your have no Accounts")
         logger.info("Getting Accounts Flat failed!: " + t.getMessage)
       }
     }
@@ -176,20 +174,14 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
   }
 
   def informUser(text: String) = {
-    val send = Map("chat_id" -> chatId.toString,
-      "text" -> text, "parse_mode" -> "HTML")
-    telegramApi.sendMessage(send)
+    val message = TelegramMessage(chatId, text)
+    telegramApi.sendMessage(message)
   }
 
   def requestSMSId(text: String) = {
-    val messageText = text
-    val force_reply = """{"force_reply": true}"""
-    val send = Map("chat_id" -> chatId.toString, "text" -> messageText,
-      "reply_markup" -> force_reply)
-    telegramApi.sendReplyMessage(send) onSuccess {
-      case ServerAnswerReply(_, m) => {
-        context.parent ! WaitForReply(m.chat.id, m.message_id)
-      }
+    val message = TelegramMessage(chatId, text, reply_markup = Some(Left(ForceReply(true))))
+    telegramApi.sendReplyMessage(message) onSuccess {
+      case ServerAnswerReply(_, m) => context.parent ! WaitForReply(m.chat.id, m.message_id)
     }
   }
 
