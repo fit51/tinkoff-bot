@@ -11,7 +11,7 @@ import akka.actor.{ActorContext, ActorRef, ActorSystem}
 import akka.http.scaladsl.model.Uri.Query
 import com.bankbot.CommonTypes._
 import spray.json._
-
+import java.time.Instant
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
@@ -42,6 +42,9 @@ trait TinkoffApi {
 
   def accountsFlat(sessionid: String)
                   (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[AccountsFlat]
+
+  def operations(sessionid: String)
+                (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[Operations]
 }
 
 class TinkoffApiImpl(implicit system: ActorSystem)
@@ -221,6 +224,26 @@ class TinkoffApiImpl(implicit system: ActorSystem)
         throw ResponceCodeException("Tinkoff Responce code:", entity)
       }
     }
+  }
+
+  def operations(sessionid: String)
+                (implicit context: ActorContext, logger: LoggingAdapter, self: ActorRef): Future[Operations] = {
+    import context.dispatcher
+
+    val timestamp : Long = Instant.now.getEpochSecond
+    val params = Map("sessionid" -> sessionid, "start" -> "0000000000000", "end" -> (timestamp.toString + "000"))
+    val uri = Uri(url + "/operations").withQuery(Query(params))
+    val response = http.singleRequest(HttpRequest(uri = uri))
+    response flatMap {
+      case HttpResponse(StatusCodes.OK, _, entity, _) => {
+        Unmarshal(entity).to[Operations]
+      }
+      case HttpResponse(code, _, entity, _) => {
+        logger.warning("Tinkoff session_status Request failed, response code: " + code)
+        throw ResponceCodeException("Tinkoff Responce code:", entity)
+      }
+    }
+
   }
 
 }

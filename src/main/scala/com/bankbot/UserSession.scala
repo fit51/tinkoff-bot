@@ -8,7 +8,7 @@ import com.bankbot.tinkoff.TinkoffApi
 import com.bankbot.telegram.TelegramTypes._
 import com.bankbot.tinkoff.TinkoffTypes._
 import com.bankbot.SessionManager.WaitForReply
-import telegram.PrettyMessage.prettyBalance
+import telegram.PrettyMessage._
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -72,8 +72,9 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     }
     case Reply(messageId, smsId) => {
       restartPoisonTick
-      if(smsId forall(_.isDigit))
+      if(smsId forall(_.isDigit)) {
         tinkoffApi.confirm(session, operationTicket, smsId)
+      }
       else
         requestSMSId("SMS Code must contain only Digits. Try again:")
     }
@@ -115,13 +116,21 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     }
     case m: HistoryCommand => {
       restartPoisonTick
-      val showHistory = (ac: AccountsFlat) => {
-        "Your have no history"
+      val showHistory = (op: Operations) => op match {
+        case Operations(_, Some(payload)) => {
+          payload.take(10).map(op => {
+            prettyOperation(op.description, op.debitingTime, op.amount, op.spendingCategory)
+          }).mkString("\n")
+        }
+        case _ => {
+          log.info(op.toString)
+          "Your have no history"
+        }
       }
-      processAccounts(showHistory)
+      processOperations(showHistory)
     }
     case SessionStatus("OK", Some(payload), _) => {
-      log.info(s"SessinStatus OK")
+      log.info(s"SessionStatus OK")
       val nextWarmUp = payload.millisLeft/2
       scheduler.scheduleOnce(nextWarmUp millis, self, WarmUpSession)
     }
@@ -142,9 +151,21 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       case Success(acFlat) => informUser(f(acFlat))
       case Failure(t) => {
         val send = Map("chat_id" -> chatId.toString,
-          "text" -> "Your have no Accounts", "parse_mode" -> "HTML")
+          "text" -> "You have no Accounts", "parse_mode" -> "HTML")
         telegramApi.sendMessage(send)
         logger.info("Getting Accounts Flat failed!: " + t.getMessage)
+      }
+    }
+  }
+
+  def processOperations(g: (Operations) => String) = {
+    tinkoffApi.operations(session).onComplete {
+      case Success(opers) => informUser(g(opers))
+      case Failure(t) => {
+        val send = Map("chat_id" -> chatId.toString,
+          "text" -> "You have no Operations in the last month!", "parse_mode" -> "HTML")
+        telegramApi.sendMessage(send)
+        logger.info("Getting Operations failed!: " + t.getMessage)
       }
     }
   }
@@ -166,7 +187,9 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     val send = Map("chat_id" -> chatId.toString, "text" -> messageText,
       "reply_markup" -> force_reply)
     telegramApi.sendReplyMessage(send) onSuccess {
-      case ServerAnswerReply(_, m) => context.parent ! WaitForReply(m.chat.id, m.message_id)
+      case ServerAnswerReply(_, m) => {
+        context.parent ! WaitForReply(m.chat.id, m.message_id)
+      }
     }
   }
 
