@@ -163,7 +163,7 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       case Success(opers) => informUser(g(opers))
       case Failure(t) => {
         val send = Map("chat_id" -> chatId.toString,
-          "text" -> "You have no Operations in the last month!", "parse_mode" -> "HTML")
+          "text" -> "You have no Operations", "parse_mode" -> "HTML")
         telegramApi.sendMessage(send)
         logger.info("Getting Operations failed!: " + t.getMessage)
       }
