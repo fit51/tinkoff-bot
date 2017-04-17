@@ -39,20 +39,18 @@ object TinkoffTypes {
 
   case class SessionStatus(resultCode: String, payload: Option[SessionStatusPayLoad], errorMessage: Option[String])
 
-  case class Balance(currency: Currency, value: Int)
+  case class Amount(currency: Currency, value: Int)
 
-  case class Account(name: String, moneyAmount: Balance, accountType: String)
+  case class Account(id: String, name: String, moneyAmount: Amount, accountType: String)
 
   case class AccountsFlat(resultCode: String, payload: Option[Vector[Account]])
 
-  case class DebitingTime(milliseconds: Long)
+  case class TimeStamp(milliseconds: Long)
 
-  case class Amount(currency: Currency, value: Double)
+  case class Payment(paymentId: String, paymentType: String, providerId: String, cardNumber: String)
 
-  case class SpendingCategory(id: String, name: String, icon: String, parentId: String)
-
-  case class Operation(description: String, debitingTime: DebitingTime, amount: Amount,
-                      spendingCategory: SpendingCategory)
+  case class Operation(description: String, operationTime: TimeStamp, amount: Amount,
+                       payment: Payment, account: String)
 
   case class Operations(resultCode: String, payload: Option[Vector[Operation]])
 
@@ -80,14 +78,12 @@ trait MessageMarshallingTinkoff extends DefaultJsonProtocol {
   implicit val warmUpFormat = jsonFormat1(WarmUp)
   implicit val sessionStatusPayLoadFormat = jsonFormat4(SessionStatusPayLoad)
   implicit val sessionStatusFormat = jsonFormat3(SessionStatus)
-  implicit val balanceFormat = jsonFormat2(Balance)
-  implicit val accountFormat = jsonFormat3(Account)
-  implicit val accountsFlatFormat = jsonFormat2(AccountsFlat)
-
-  implicit val spendingCategoryFormat = jsonFormat4(SpendingCategory)
   implicit val amountFormat = jsonFormat2(Amount)
-  implicit val debitingTimeFormat = jsonFormat1(DebitingTime)
-  implicit val operationFormat = jsonFormat4(Operation)
+  implicit val accountFormat = jsonFormat4(Account)
+  implicit val accountsFlatFormat = jsonFormat2(AccountsFlat)
+  implicit val paymentFormat = jsonFormat4(Payment)
+  implicit val timeStampFormat = jsonFormat1(TimeStamp)
+  implicit val operationFormat = jsonFormat5(Operation)
   implicit val operationsFormat = jsonFormat2(Operations)
 
   implicit object ServerAnswerJsonFormat extends RootJsonFormat[ServerAnswer] {

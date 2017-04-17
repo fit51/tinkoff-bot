@@ -119,7 +119,7 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       val showHistory = (op: Operations) => op match {
         case Operations(_, Some(payload)) => {
           payload.take(10).map(op => {
-            prettyOperation(op.description, op.debitingTime, op.amount, op.spendingCategory)
+            prettyOperation(op.description, op.operationTime, op.amount, op.payment)
           }).mkString("\n")
         }
         case _ => {
@@ -156,9 +156,9 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     }
   }
 
-  def processOperations(g: (Operations) => String) = {
+  def processOperations(f: (Operations) => String) = {
     tinkoffApi.operations(session).onComplete {
-      case Success(opers) => informUser(g(opers))
+      case Success(opers) => informUser(f(opers))
       case Failure(t) => {
         informUser("You have no Operations")
         logger.info("Getting Operations failed!: " + t.getMessage)
