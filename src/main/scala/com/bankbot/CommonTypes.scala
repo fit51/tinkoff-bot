@@ -10,3 +10,10 @@ object CommonTypes {
   case class ResponceCodeException(code: String, entity: ResponseEntity) extends Exception("Responce code: " + code)
 
 }
+
+object StringBase {
+  final val start =
+    """"Hi there!
+      |
+    """.stripMargin
+}

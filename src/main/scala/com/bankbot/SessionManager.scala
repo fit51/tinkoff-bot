@@ -1,10 +1,11 @@
 package com.bankbot
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingAdapter
-import com.bankbot.SessionManager.{ContactRequest, PossibleContact, SendBalance}
+import com.bankbot.UserSession.Reply
 import com.bankbot.tinkoff.TinkoffApi
 import telegram.TelegramTypes._
+import telegram.PrettyMessage.prettyThx4Contact
 import telegram.TelegramApi
 
 /**
@@ -16,55 +17,71 @@ object SessionManager {
   def props(telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =
     Props(classOf[SessionManager], telegramApi, tinkoffApi)
 
-  case class ContactRequest(m: Message)
-  case class PossibleContact(m: Message)
-  case class SendBalance(m: Message)
+  case class PossibleContact(chatId: Int, contact: Contact)
+  case class PossibleReply(chatId: Int, messageId: Int, text: String)
+  case class WaitForReply(chatId: Int, messageId: Int)
 }
 
 class SessionManager(telegramApi: TelegramApi,
                      tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
+  import com.bankbot.SessionManager._
+  import UserSession.SessionCommand
   implicit val logger: LoggingAdapter = log
-  var contacts: Map[Int, Contact] = Map()
+  type UserId = Int
+  type ChatId = Int
+  type MessageId = Int
 
-  def createUserSession(chat: Chat) =
-    context.actorOf(UserSession.props(chat), chat.id.toString)
-
-  def getContacts = contacts
+  private var contacts: Map[UserId, Contact] = Map()
+  private var awatingReply: Set[(ChatId, MessageId)] = Set()
 
   override def receive: Receive = {
 
-    case SendBalance(message) => {
-      if (!contacts.contains(message.from.get.id)) {
-        val send = Map("chat_id" -> message.chat.id.toString,
-          "text" -> "You have to share your contact first. Then request balance again!", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
-        self ! ContactRequest(message)
+    case command: SessionCommand => {
+      if (!contacts.contains(command.from.id)) {
+        contactRequest(command.chatId)
       } else {
-        // - for now
-        val send = Map("chat_id" -> message.chat.id.toString,
-          "text" -> "Your balance is: 0", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
+        val name = command.chatId.toString
+        def create() = {
+          val userSession = createUserSession(name, command)
+          userSession forward command
+        }
+        context.child(name). fold(create)(_ forward command)
       }
     }
 
-    case PossibleContact(message) => {
-      if (contacts.contains(message.from.get.id)) {
-        val send = Map("chat_id" -> message.chat.id.toString,
-          "text" -> "Already got your contact!", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
-      } else {
-        contacts += (message.from.get.id -> message.contact.get)
-        val send = Map("chat_id" -> message.chat.id.toString,
-          "text" -> "Thanks for sharing your contact!", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
+    case PossibleReply(chatId, messageId, text) => {
+      if (awatingReply((chatId, messageId))) {
+        context.child(chatId.toString) foreach { _ ! Reply(messageId, text) }
+        awatingReply -= ((chatId, messageId))
       }
     }
 
-    case ContactRequest(message) if !contacts.contains(message.from.get.id) => {
-        val messageText = "This operation requires your phone number."
-        val send = Map("chat_id" -> message.chat.id.toString, "text" -> messageText,
-          "reply_markup" -> "{\"keyboard\":[[{\"text\":\"Send number\", \"request_contact\": true}]]}")
-        telegramApi.sendMessage(send)
-      }
+    case WaitForReply(chatId, messageId) => {
+      awatingReply += ((chatId, messageId))
+    }
+
+    case PossibleContact(chatId: Int, contact: Contact) => {
+      contacts += (contact.user_id -> contact)
+      val message = TelegramMessage(chatId, prettyThx4Contact)
+      telegramApi.sendMessage(message)
+    }
+
+  }
+
+  def createUserSession(name: String, command: SessionCommand): ActorRef = {
+    context.actorOf(
+      UserSession.props(
+        command.chatId, contacts(command.from.id), command, telegramApi, tinkoffApi, context.system.scheduler
+      ),
+      name
+    )
+  }
+
+  def contactRequest(chatId: Int) = {
+    val keyboardButton = KeyboardButton("Send My Phone Number", Some(true))
+    val replyKeyboardMarkup = ReplyKeyboardMarkup(Vector(Vector(keyboardButton)), Some(true), Some(true))
+    val message = TelegramMessage(chatId, "This operation requires your phone number.",
+      reply_markup = Some(Right(replyKeyboardMarkup)))
+    telegramApi.sendMessage(message)
   }
 }

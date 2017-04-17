@@ -3,7 +3,7 @@ package com.bankbot.telegram
 import java.time.{Instant, ZoneId}
 import java.time.format.DateTimeFormatter
 
-import com.bankbot.tinkoff.TinkoffTypes.Rate
+import com.bankbot.tinkoff.TinkoffTypes.{Balance, Rate}
 
 /**
   * Object provides methods to Create Strings for Telegram Messages with HTML parse_mode
@@ -22,6 +22,35 @@ object PrettyMessage {
       (rates.map { rate =>
       rate.fromCurrency.name + "\t"+ rate.toCurrency.name + "\t" +rate.sell + "\t" + rate.buy + "\n"
       }).mkString("")
+  }
+
+  def prettyHelp() =
+    """<b>Hi there!</b>
+      |I am a bot that implements some functionality of Tinkoff Internet Bank.
+      |You can control me with this commands:
+      |/rates - get Currency Rates
+      |/balance - get your Balance
+      |/history - get yor history
+      |/help - see this message again
+      |Note that balance and history require sharing your phone number.
+    """.stripMargin
+
+  def prettyNonPrivate() =
+    """<b>Sorry!</b>
+      |This bot support only <b>private</b> chats.
+    """.stripMargin
+
+  def prettyThx4Contact() =
+    """Thanks for sharing your contact!
+      |Now you can use this commands:
+      |/balance - get your Balance
+      |/history - get yor history
+    """.stripMargin
+
+  def prettyBalance(name: String, accountType: String, accountBalance: Balance) = {
+    s"<b>$name</b>\n" +
+    s"<b>Type:</b> $accountType\n" +
+      s"<b>Balance:</b>\n ${accountBalance.value}\t${accountBalance.currency.name}"
   }
 
 }
