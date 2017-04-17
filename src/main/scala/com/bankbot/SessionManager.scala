@@ -62,9 +62,8 @@ class SessionManager(telegramApi: TelegramApi,
 
     case PossibleContact(chatId: Int, contact: Contact) => {
       contacts += (contact.user_id -> contact)
-      val send = Map("chat_id" -> chatId.toString,
-        "text" -> prettyThx4Contact, "parse_mode" -> "HTML")
-      telegramApi.sendMessage(send)
+      val message = TelegramMessage(chatId, prettyThx4Contact)
+      telegramApi.sendMessage(message)
     }
 
   }
@@ -79,11 +78,10 @@ class SessionManager(telegramApi: TelegramApi,
   }
 
   def contactRequest(chatId: Int) = {
-    val messageText = "This operation requires your phone number."
-    val reply_markup = "{\"keyboard\":[[{\"text\":\"Send My Phone Number\", \"request_contact\": true}]], " +
-      "\"resize_keyboard\": true, \"one_time_keyboard\": true}"
-    val send = Map("chat_id" -> chatId.toString, "text" -> messageText,
-      "reply_markup" -> reply_markup)
-    telegramApi.sendMessage(send)
+    val keyboardButton = KeyboardButton("Send My Phone Number", Some(true))
+    val replyKeyboardMarkup = ReplyKeyboardMarkup(Vector(Vector(keyboardButton)), Some(true), Some(true))
+    val message = TelegramMessage(chatId, "This operation requires your phone number.",
+      reply_markup = Some(Right(replyKeyboardMarkup)))
+    telegramApi.sendMessage(message)
   }
 }

@@ -5,7 +5,7 @@ import akka.event.LoggingAdapter
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.bankbot.UserSession.SessionCommand
 import com.bankbot.telegram.TelegramApi
-import com.bankbot.telegram.TelegramTypes.{Chat, Contact, Message, User}
+import com.bankbot.telegram.TelegramTypes._
 import com.bankbot.tinkoff.TinkoffApi
 import org.mockito.Matchers.any
 import org.scalatest.{Matchers, WordSpecLike}
@@ -47,23 +47,21 @@ class SessionManagerTest extends TestKit(ActorSystem("testBotSystem"))
     "send a message about sharing the contact when sent SendBalance and" +
       " the user is not in the contact list" in {
       sessionManager ! UserSession.BalanceCommand(testUser1, testChat.id)
-      val messageText = "This operation requires your phone number."
-      val reply_markup = "{\"keyboard\":[[{\"text\":\"Send My Phone Number\", \"request_contact\": true}]], " +
-        "\"resize_keyboard\": true, \"one_time_keyboard\": true}"
-      val send = Map("chat_id" -> testMessage1.chat.id.toString, "text" -> messageText,
-        "reply_markup" -> reply_markup)
+      val keyboardButton = KeyboardButton("Send My Phone Number", Some(true))
+      val replyKeyboardMarkup = ReplyKeyboardMarkup(Vector(Vector(keyboardButton)), Some(true), Some(true))
+      val message = TelegramMessage(testMessage1.chat.id, "This operation requires your phone number.",
+        reply_markup = Some(Right(replyKeyboardMarkup)))
       eventually {
-        verify(telegramApiTest).sendMessage(exact(send))(any(classOf[ActorContext]),
+        verify(telegramApiTest).sendMessage(exact(message))(any(classOf[ActorContext]),
           any(classOf[LoggingAdapter]))
       }
     }
 
     "send message \"Thanks for sharing your contact!\" if gets a message with contact" in {
       sessionManager ! SessionManager.PossibleContact(testMessage2.chat.id, testContact2)
-      val send = Map("chat_id" -> testMessage2.chat.id.toString,
-        "text" -> prettyThx4Contact, "parse_mode" -> "HTML")
+      val message = TelegramMessage(testMessage2.chat.id, prettyThx4Contact)
       eventually {
-        verify(telegramApiTest).sendMessage(exact(send))(any(classOf[ActorContext]),
+        verify(telegramApiTest).sendMessage(exact(message))(any(classOf[ActorContext]),
           any(classOf[LoggingAdapter]))
       }
     }

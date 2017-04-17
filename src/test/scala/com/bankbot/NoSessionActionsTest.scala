@@ -7,7 +7,7 @@ import akka.event.LoggingAdapter
 import akka.testkit.{ImplicitSender, TestKit}
 import com.bankbot.NoSessionActions._
 import com.bankbot.telegram.{PrettyMessage, TelegramApi}
-import com.bankbot.telegram.TelegramTypes.{Chat, Message, User}
+import com.bankbot.telegram.TelegramTypes.{Chat, Message, TelegramMessage, User}
 import com.bankbot.tinkoff.TinkoffApi
 import com.bankbot.tinkoff.TinkoffTypes.{Currency, Rate}
 import com.miguno.akka.testing.VirtualTime
@@ -64,22 +64,19 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
     }
     "send Rates to telegram chat when requested" in {
       noSessionActions ! SendRates(testChat.id)
-      val send = Map("chat_id" -> testChat.id.toString,
-        "text" -> PrettyMessage.prettyRates(
-          Instant.ofEpochMilli(2L), Vector(rateNew), ZoneId.of("Europe/Moscow")
-        ), "parse_mode" -> "HTML")
+      val message = TelegramMessage(testChat.id, PrettyMessage.prettyRates(
+        Instant.ofEpochMilli(2L), Vector(rateNew), ZoneId.of("Europe/Moscow")))
       eventually {
-        verify(telegramApiTest).sendMessage(exact(send))(any(classOf[ActorContext]),
+        verify(telegramApiTest).sendMessage(exact(message))(any(classOf[ActorContext]),
           any(classOf[LoggingAdapter]))
       }
     }
     "send reply to Telegram Message when requested" in {
       val testText = "test text"
       noSessionActions ! SendMessage(testChat.id, testText)
-      val send = Map("chat_id" -> testChat.id.toString,
-        "text" -> testText, "parse_mode" -> "HTML")
+      val message = TelegramMessage(testChat.id, testText)
       eventually {
-        verify(telegramApiTest).sendMessage(exact(send))(any(classOf[ActorContext]),
+        verify(telegramApiTest).sendMessage(exact(message))(any(classOf[ActorContext]),
           any(classOf[LoggingAdapter]))
       }
     }
