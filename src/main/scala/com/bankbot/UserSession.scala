@@ -8,7 +8,7 @@ import com.bankbot.tinkoff.TinkoffApi
 import com.bankbot.telegram.TelegramTypes._
 import com.bankbot.tinkoff.TinkoffTypes._
 import com.bankbot.SessionManager.WaitForReply
-import telegram.PrettyMessage.prettyBalance
+import telegram.PrettyMessage._
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -72,8 +72,9 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     }
     case Reply(messageId, smsId) => {
       restartPoisonTick
-      if(smsId forall(_.isDigit))
+      if(smsId forall(_.isDigit)) {
         tinkoffApi.confirm(session, operationTicket, smsId)
+      }
       else
         requestSMSId("SMS Code must contain only Digits. Try again:")
     }
@@ -115,13 +116,21 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     }
     case m: HistoryCommand => {
       restartPoisonTick
-      val showHistory = (ac: AccountsFlat) => {
-        "Your have no history"
+      val showHistory = (op: Operations) => op match {
+        case Operations(_, Some(payload)) => {
+          payload.take(10).map(op => {
+            prettyOperation(op.description, op.debitingTime, op.amount, op.spendingCategory)
+          }).mkString("\n")
+        }
+        case _ => {
+          log.info(op.toString)
+          "Your have no history"
+        }
       }
-      processAccounts(showHistory)
+      processOperations(showHistory)
     }
     case SessionStatus("OK", Some(payload), _) => {
-      log.info(s"SessinStatus OK")
+      log.info(s"SessionStatus OK")
       val nextWarmUp = payload.millisLeft/2
       scheduler.scheduleOnce(nextWarmUp millis, self, WarmUpSession)
     }
@@ -147,6 +156,16 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     }
   }
 
+  def processOperations(g: (Operations) => String) = {
+    tinkoffApi.operations(session).onComplete {
+      case Success(opers) => informUser(g(opers))
+      case Failure(t) => {
+        informUser("You have no Operations")
+        logger.info("Getting Operations failed!: " + t.getMessage)
+      }
+    }
+  }
+
   def restartPoisonTick() = {
     poisonTick.cancel()
     poisonTick = scheduler.scheduleOnce(5 minutes, self, PoisonPill)
@@ -158,8 +177,6 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
   }
 
   def requestSMSId(text: String) = {
-//    val keyboardButton = KeyboardButton("name", Some(true))
-//    val replyKeyboardMarkup = ReplyKeyboardMarkup(Vector(Vector(keyboardButton)), Some(true), Some(true))
     val message = TelegramMessage(chatId, text, reply_markup = Some(Left(ForceReply(true))))
     telegramApi.sendReplyMessage(message) onSuccess {
       case ServerAnswerReply(_, m) => context.parent ! WaitForReply(m.chat.id, m.message_id)

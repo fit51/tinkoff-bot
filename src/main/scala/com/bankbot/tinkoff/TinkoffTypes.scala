@@ -45,6 +45,18 @@ object TinkoffTypes {
 
   case class AccountsFlat(resultCode: String, payload: Option[Vector[Account]])
 
+  case class DebitingTime(milliseconds: Long)
+
+  case class Amount(currency: Currency, value: Double)
+
+  case class SpendingCategory(id: String, name: String, icon: String, parentId: String)
+
+  case class Operation(description: String, debitingTime: DebitingTime, amount: Amount,
+                      spendingCategory: SpendingCategory)
+
+  case class Operations(resultCode: String, payload: Option[Vector[Operation]])
+
+
 }
 
 /**
@@ -71,6 +83,12 @@ trait MessageMarshallingTinkoff extends DefaultJsonProtocol {
   implicit val balanceFormat = jsonFormat2(Balance)
   implicit val accountFormat = jsonFormat3(Account)
   implicit val accountsFlatFormat = jsonFormat2(AccountsFlat)
+
+  implicit val spendingCategoryFormat = jsonFormat4(SpendingCategory)
+  implicit val amountFormat = jsonFormat2(Amount)
+  implicit val debitingTimeFormat = jsonFormat1(DebitingTime)
+  implicit val operationFormat = jsonFormat4(Operation)
+  implicit val operationsFormat = jsonFormat2(Operations)
 
   implicit object ServerAnswerJsonFormat extends RootJsonFormat[ServerAnswer] {
 
