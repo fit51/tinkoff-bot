@@ -160,9 +160,7 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
     tinkoffApi.operations(session).onComplete {
       case Success(opers) => informUser(g(opers))
       case Failure(t) => {
-        val send = Map("chat_id" -> chatId.toString,
-          "text" -> "You have no Operations", "parse_mode" -> "HTML")
-        telegramApi.sendMessage(send)
+        informUser("You have no Operations")
         logger.info("Getting Operations failed!: " + t.getMessage)
       }
     }

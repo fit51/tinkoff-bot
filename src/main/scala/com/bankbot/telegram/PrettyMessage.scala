@@ -31,7 +31,7 @@ object PrettyMessage {
       |You can control me with this commands:
       |/rates - get Currency Rates
       |/balance - get your Balance
-      |/history - get yor history
+      |/history - get your 10 last operations
       |/help - see this message again
       |Note that balance and history require sharing your phone number.
     """.stripMargin
