@@ -48,18 +48,18 @@ object PrettyMessage {
       |/history - get yor history
     """.stripMargin
 
-  def prettyBalance(name: String, accountType: String, accountBalance: Balance) = {
+  def prettyBalance(name: String, accountType: String, accountBalance: Amount) = {
     s"<b>$name</b>\n" +
     s"<b>Type:</b> $accountType\n" +
       s"<b>Balance:</b>\n ${accountBalance.value}\t${accountBalance.currency.name}"
   }
 
-  def prettyOperation(description: String, debitingTime: DebitingTime, amount: Amount,
-                      spendingCategory: SpendingCategory) = {
+  def prettyOperation(description: String, operationTime: TimeStamp, amount: Amount,
+                      payment: Payment) = {
     s"<b>$description</b>\n" +
-    s"<b>Debiting time:</b> ${DateTime(debitingTime.milliseconds).toString().dropRight(9)}\n" +
-    s"<b>Amount:</b> ${amount.value}\n" +
-    s"<b>${spendingCategory.name}</b>\n"
+    s"<b>Operation time:</b> ${DateTime(operationTime.milliseconds).toString().dropRight(9)}\n" +
+    s"<b>Amount:</b> ${amount.value} ${amount.currency.name}\n" +
+    s"<b>Card:</b>${payment.cardNumber}\n"
   }
 
 }
