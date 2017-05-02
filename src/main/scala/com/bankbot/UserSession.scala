@@ -7,7 +7,7 @@ import com.bankbot.telegram.TelegramApi
 import com.bankbot.tinkoff.TinkoffApi
 import com.bankbot.telegram.TelegramTypes._
 import com.bankbot.tinkoff.TinkoffTypes._
-import com.bankbot.SessionManager.WaitForReply
+import com.bankbot.SessionManager.{WaitForReply, WithChatSession}
 import telegram.PrettyMessage._
 
 import scala.concurrent.duration._
@@ -23,9 +23,8 @@ object UserSession {
             tinkoffApi: TinkoffApi, scheduler: Scheduler) = Props(
     classOf[UserSession], chatId, contact, initialCommand, telegramApi, tinkoffApi, scheduler
   )
-  abstract class SessionCommand {
+  abstract class SessionCommand extends WithChatSession {
     val from: User
-    val chatId: Int
   }
   case class BalanceCommand(override val from: User, override val chatId: Int) extends SessionCommand
   case class HistoryCommand(override val from: User, override val chatId: Int) extends SessionCommand
