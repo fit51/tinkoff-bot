@@ -2,7 +2,6 @@ package com.bankbot
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingAdapter
-import com.bankbot.SessionManager.PossibleReply
 import com.bankbot.telegram.TelegramApi
 import com.bankbot.telegram.PrettyMessage.{prettyHelp, prettyNonPrivate}
 import telegram.TelegramTypes.{Message, ServerAnswer}
@@ -66,7 +65,7 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
               sessionManager ! SessionManager.PossibleContact(update.message.chat.id, contact)
             }
             case Message(message_id, Some(user), chat, _, Some(reply), Some(text), None) => {
-              sessionManager ! PossibleReply(chat.id, reply.message_id, text)
+              sessionManager ! SessionManager.PossibleReply(chat.id, reply.message_id, text)
             }
           }
         } else {
