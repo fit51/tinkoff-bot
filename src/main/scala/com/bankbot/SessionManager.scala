@@ -66,6 +66,11 @@ class SessionManager(telegramApi: TelegramApi,
       telegramApi.sendMessage(message)
     }
 
+    case Terminated(actor)=> {
+      val remove = awatingReply.filter(pair => pair._1 == actor.path.name)
+      awatingReply = awatingReply -- remove
+    }
+
   }
 
   def createUserSession(name: String, command: SessionCommand): ActorRef = {

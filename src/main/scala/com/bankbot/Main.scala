@@ -2,7 +2,7 @@ package com.bankbot
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.bankbot.telegram.TelegramApiImpl
-import com.bankbot.tinkoff.{TinkoffApi, TinkoffApiImpl}
+import com.bankbot.tinkoff.TinkoffApiImpl
 import com.typesafe.config.ConfigFactory
 
 /**

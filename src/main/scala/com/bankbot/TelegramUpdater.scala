@@ -34,30 +34,22 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
           update.message match {
             case Message(_, Some(user), chat, _, None, Some(text), None) => {
               text match {
-                // - Если кто-то пытается пользоваться без авторизации,
-                // - то ему придёт кнопка отправки контакта.
                 case s if s == "/rates" || s == "/r" => {
-                  // – для получения курсов
                   noSessionActions ! NoSessionActions.SendRates(chat.id)
                 }
                 case s if s == "/balance" || s == "/b" => {
-                  // – команды, которые требую аутентификации
                   sessionManager ! UserSession.BalanceCommand(user, chat.id)
                 }
                 case s if s == "/history" || s == "/hi" => {
-                  // – команды, которые требую аутентификации
                   sessionManager ! UserSession.HistoryCommand(user, chat.id)
                 }
                 case s if s == "/help" || s == "/h" => {
-                  // -  справочник доступных функций
                   noSessionActions ! NoSessionActions.SendMessage(chat.id, prettyHelp)
                 }
                 case s if s == "/start" || s == "/s" => {
-                  // -  сообщение при старте
                   noSessionActions ! NoSessionActions.SendMessage(chat.id, prettyHelp)
                 }
                 case s => {
-                  //            log.info("Got undefined command: " + s)
                   noSessionActions ! NoSessionActions.SendMessage(chat.id, "No Such Command\nSee /help")
                 }
               }
