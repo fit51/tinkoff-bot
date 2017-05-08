@@ -3,7 +3,8 @@ package com.bankbot.telegram
 import java.time.{Instant, ZoneId}
 import java.time.format.DateTimeFormatter
 
-import com.bankbot.tinkoff.TinkoffTypes.{Balance, Rate}
+import akka.http.scaladsl.model.DateTime
+import com.bankbot.tinkoff.TinkoffTypes._
 
 /**
   * Object provides methods to Create Strings for Telegram Messages with HTML parse_mode
@@ -30,7 +31,7 @@ object PrettyMessage {
       |You can control me with this commands:
       |/rates - get Currency Rates
       |/balance - get your Balance
-      |/history - get yor history
+      |/history - get your 10 last operations
       |/help - see this message again
       |Note that balance and history require sharing your phone number.
     """.stripMargin
@@ -47,10 +48,18 @@ object PrettyMessage {
       |/history - get yor history
     """.stripMargin
 
-  def prettyBalance(name: String, accountType: String, accountBalance: Balance) = {
+  def prettyBalance(name: String, accountType: String, accountBalance: Amount) = {
     s"<b>$name</b>\n" +
     s"<b>Type:</b> $accountType\n" +
       s"<b>Balance:</b>\n ${accountBalance.value}\t${accountBalance.currency.name}"
+  }
+
+  def prettyOperation(description: String, operationTime: TimeStamp, amount: Amount,
+                      payment: Payment) = {
+    s"<b>$description</b>\n" +
+    s"<b>Operation time:</b> ${DateTime(operationTime.milliseconds).toString().dropRight(9)}\n" +
+    s"<b>Amount:</b> ${amount.value} ${amount.currency.name}\n" +
+    s"<b>Card:</b>${payment.cardNumber}\n"
   }
 
 }

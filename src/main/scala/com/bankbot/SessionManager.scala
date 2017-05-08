@@ -2,6 +2,7 @@ package com.bankbot
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingAdapter
+import akka.routing.ConsistentHashingRouter.ConsistentHashable
 import com.bankbot.UserSession.Reply
 import com.bankbot.tinkoff.TinkoffApi
 import telegram.TelegramTypes._
@@ -17,8 +18,13 @@ object SessionManager {
   def props(telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =
     Props(classOf[SessionManager], telegramApi, tinkoffApi)
 
-  case class PossibleContact(chatId: Int, contact: Contact)
-  case class PossibleReply(chatId: Int, messageId: Int, text: String)
+  abstract class WithChatSession extends ConsistentHashable {
+    val chatId: Int
+    override def consistentHashKey: Any = chatId
+  }
+
+  case class PossibleContact(override val chatId: Int, contact: Contact) extends WithChatSession
+  case class PossibleReply( override val chatId: Int, messageId: Int, text: String) extends WithChatSession
   case class WaitForReply(chatId: Int, messageId: Int)
 }
 
