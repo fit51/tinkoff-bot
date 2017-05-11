@@ -23,7 +23,7 @@ object UserSession {
             tinkoffApi: TinkoffApi, scheduler: Scheduler) = Props(
     classOf[UserSession], chatId, contact, initialCommand, telegramApi, tinkoffApi, scheduler
   )
-  abstract class SessionCommand extends WithChatSession {
+  sealed trait SessionCommand extends WithChatSession {
     val from: User
   }
   case class BalanceCommand(override val from: User, override val chatId: Int) extends SessionCommand

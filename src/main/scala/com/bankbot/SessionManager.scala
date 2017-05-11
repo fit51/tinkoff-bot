@@ -18,7 +18,7 @@ object SessionManager {
   def props(telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =
     Props(classOf[SessionManager], telegramApi, tinkoffApi)
 
-  abstract class WithChatSession extends ConsistentHashable {
+  trait WithChatSession extends ConsistentHashable {
     val chatId: Int
     override def consistentHashKey: Any = chatId
   }
