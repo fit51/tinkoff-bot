@@ -55,7 +55,7 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
 
     "call getSession on start" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
-      val userSession = parent.childActorOf(
+      parent.childActorOf(
         UserSession.props(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler)
       )
       eventually {
