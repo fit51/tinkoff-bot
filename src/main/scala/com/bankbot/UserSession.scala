@@ -3,8 +3,8 @@ package com.bankbot
 import akka.actor.{Actor, ActorLogging, PoisonPill, Props, Scheduler}
 import akka.event.LoggingAdapter
 import com.bankbot.UserSession.SessionCommand
-import com.bankbot.telegram.TelegramApi
-import com.bankbot.tinkoff.TinkoffApi
+import com.bankbot.telegram.{TelegramApi, TelegramApiImpl}
+import com.bankbot.tinkoff.{TinkoffApi, TinkoffApiImpl}
 import com.bankbot.telegram.TelegramTypes._
 import com.bankbot.tinkoff.TinkoffTypes._
 import com.bankbot.SessionManager.{WaitForReply, WithChatSession}
@@ -19,9 +19,8 @@ import scala.util.{Failure, Success}
   */
 
 object UserSession {
-  def props(chatId: Int, contact: Contact, initialCommand: SessionCommand, telegramApi: TelegramApi,
-            tinkoffApi: TinkoffApi, scheduler: Scheduler) = Props(
-    classOf[UserSession], chatId, contact, initialCommand, telegramApi, tinkoffApi, scheduler
+  def props(chatId: Int, contact: Contact, initialCommand: SessionCommand) = Props(
+    classOf[UserSession], chatId, contact, initialCommand, None, None, None
   )
   sealed trait SessionCommand extends WithChatSession {
     val from: User
@@ -33,11 +32,18 @@ object UserSession {
   case object GetAccessLevel
 }
 
-class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionCommand, telegramApi: TelegramApi,
-                  tinkoffApi: TinkoffApi, scheduler: Scheduler) extends Actor with ActorLogging {
+class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionCommand,
+                  mayBeTelegramApi: Option[TelegramApi], mayBeTinkoffApi: Option[TinkoffApi],
+                  mayBeScheduler: Option[Scheduler]) extends Actor with ActorLogging {
   import UserSession._
   import context.dispatcher
   implicit val logger: LoggingAdapter = log
+  implicit val system = context.system
+  val scheduler = mayBeScheduler.getOrElse(context.system.scheduler)
+  val telegramApi = mayBeTelegramApi.getOrElse(new TelegramApiImpl)
+  val tinkoffApi = mayBeTinkoffApi.getOrElse(new TinkoffApiImpl)
+
+  log.info("UserSession created! " + context.self.path.toString)
 
   var session: String = ""
   var operationTicket = ""
@@ -77,13 +83,16 @@ class UserSession(chatId: Int, contact: Contact, var initialCommand: SessionComm
       else
         requestSMSId("SMS Code must contain only Digits. Try again:")
     }
-    case Confirm("OK", Some(payload)) => {
+    case Confirm("OK", Left(payload)) => {
       session = payload.sessionid
       tinkoffApi.levelUp(session)
     }
     case Confirm(resultCode, _) => resultCode match {
       case "CONFIRMATION_FAILED" => requestSMSId("SMS confirmation code is wrong. Try again:")
-      case _ => informUser("Internal Error.\n Try again Later")
+      case _ => {
+        informUser(s"Something went wrong... Restarting")
+        throw new Exception("SMS confirmation failed, need restart")
+      }
     }
 
     case LevelUp(resultCode, AccessLevel(level)) => (resultCode, level) match {

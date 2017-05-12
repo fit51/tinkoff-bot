@@ -50,8 +50,12 @@ class ClusterDomainEventListener extends Actor with ActorLogging {
         if(upWorkers.size ==  2) updater foreach(_ ! StartProcessing)
       }
     }
-    case state: CurrentClusterState =>
+    case state: CurrentClusterState => {
       log.info(s"Current state of the cluster: $state")
+      upWorkers = upWorkers ++ state.members.filter(m =>
+        m.roles.contains("worker") && m.status == MemberStatus.up
+      )
+    }
 
     case ControlUpdater(telegramUpdater) => updater = Some(telegramUpdater)
   }

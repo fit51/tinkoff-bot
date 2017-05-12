@@ -4,10 +4,10 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 import akka.event.LoggingAdapter
 import akka.routing.ConsistentHashingRouter.ConsistentHashable
 import com.bankbot.UserSession.Reply
-import com.bankbot.tinkoff.TinkoffApi
+import com.bankbot.tinkoff.{TinkoffApi, TinkoffApiImpl}
 import telegram.TelegramTypes._
 import telegram.PrettyMessage.prettyThx4Contact
-import telegram.TelegramApi
+import telegram.{TelegramApi, TelegramApiImpl}
 
 /**
   * Master actor
@@ -15,8 +15,8 @@ import telegram.TelegramApi
   */
 
 object SessionManager {
-  def props(telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =
-    Props(classOf[SessionManager], telegramApi, tinkoffApi)
+  def props() =
+    Props(classOf[SessionManager], None, None)
 
   trait WithChatSession extends ConsistentHashable {
     val chatId: Int
@@ -28,14 +28,21 @@ object SessionManager {
   case class WaitForReply(chatId: Int, messageId: Int)
 }
 
-class SessionManager(telegramApi: TelegramApi,
-                     tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
+class SessionManager(mayBeTelegramApi: Option[TelegramApi],
+                     mayBeTinkoffApi: Option[TinkoffApi]) extends Actor with ActorLogging {
   import com.bankbot.SessionManager._
   import UserSession.SessionCommand
   implicit val logger: LoggingAdapter = log
+  implicit val system = context.system
+  val telegramApi = mayBeTelegramApi.getOrElse(new TelegramApiImpl)
+  val tinkoffApi = mayBeTinkoffApi.getOrElse(new TinkoffApiImpl)
+
   type UserId = Int
   type ChatId = Int
   type MessageId = Int
+
+  log.info("SessionManager" +
+    " actions created! " + context.self.path.toString)
 
   private var contacts: Map[UserId, Contact] = Map()
   private var awatingReply: Set[(ChatId, MessageId)] = Set()
@@ -82,7 +89,7 @@ class SessionManager(telegramApi: TelegramApi,
   def createUserSession(name: String, command: SessionCommand): ActorRef = {
     context.actorOf(
       UserSession.props(
-        command.chatId, contacts(command.from.id), command, telegramApi, tinkoffApi, context.system.scheduler
+        command.chatId, contacts(command.from.id), command
       ),
       name
     )

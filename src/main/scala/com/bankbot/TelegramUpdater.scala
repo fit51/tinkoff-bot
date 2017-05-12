@@ -1,6 +1,7 @@
 package com.bankbot
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.cluster.{Cluster, Member, MemberStatus}
 import akka.event.LoggingAdapter
 import com.bankbot.telegram.TelegramApi
 import com.bankbot.telegram.PrettyMessage.{prettyHelp, prettyNonPrivate}
@@ -13,8 +14,11 @@ import telegram.TelegramTypes.{Message, ServerAnswer}
 object TelegramUpdater {
   def props(sessionManager: ActorRef, noSessionActions: ActorRef, telegramApi: TelegramApi) =
     Props(classOf[TelegramUpdater], sessionManager, noSessionActions, telegramApi)
+  val name = "telegram-updater"
   case object getOffset
   case class Offset(offset: Int)
+  case object StartProcessing
+  case object StopProcessing
 }
 
 class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
@@ -23,10 +27,23 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
   import TelegramUpdater._
   implicit val logger: LoggingAdapter = log
 
-  private var offset = 0
-  override def preStart(): Unit = telegramApi.getUpdates(offset)
+  log.info("TelegramUpdater created! " + context.self.path.toString)
 
-  def receive = {
+  private var offset = 0
+
+  def init: Receive = {
+    case StartProcessing => {
+      log.info("TelegramUpdater starts processing messages! " + context.self.path.toString)
+      context.become(work)
+      telegramApi.getUpdates(offset)
+    }
+  }
+
+  def work: Receive = {
+    case StopProcessing => {
+      log.info("TelegramUpdater stops processing messages! " + context.self.path.toString)
+      context.become(init)
+    }
     case ServerAnswer(true, result) => {
       for (update <- result) {
         if (update.message.chat.c_type == "private") {
@@ -70,5 +87,7 @@ class TelegramUpdater(sessionManager: ActorRef, noSessionActions: ActorRef,
     case ServerAnswer(false, _) => telegramApi.getUpdates(offset)
     case getOffset => sender ! Offset(offset)
   }
+
+  def receive = init
 
 }

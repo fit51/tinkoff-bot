@@ -36,7 +36,7 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
   val testContact = Contact("79992223344", "Tom", None, 1)
   val testSession = Session("OK", "sessionid")
   val testSignUp = SignUp("OK", "someticket", Vector("SMSBYID"))
-  val testConfirm = Confirm("OK", Some(ConfirmPayLoad("", "sessionid", 1, AdditionalAuth(false, false, false), "")))
+  val testConfirm = Confirm("OK", Left(ConfirmPayLoad("", "sessionid", 1, AdditionalAuth(false, false, false), "")))
 
   def createFixture = {
     val tinkoffApiTest = mock[TinkoffApi]
@@ -56,7 +56,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
     "call getSession on start" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       parent.childActorOf(
-        UserSession.props(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler)
+        Props(classOf[UserSession], 1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest),
+          Some(tinkoffApiTest), Some(time.scheduler))
       )
       eventually {
         verify(tinkoffApiTest).getSession()(
@@ -68,7 +69,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
     "call signUp with session_id and user phone, when Session is received" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       val userSession = parent.childActorOf(
-        UserSession.props(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler)
+        Props(classOf[UserSession], 1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest),
+          Some(tinkoffApiTest), Some(time.scheduler))
       )
       userSession ! testSession
       eventually {
@@ -84,7 +86,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
       import system.dispatcher
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       val userSession = parent.childActorOf(
-        UserSession.props(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler)
+        Props(classOf[UserSession], 1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest),
+          Some(tinkoffApiTest), Some(time.scheduler))
       )
       w(telegramApiTest.sendReplyMessage(
         any(classOf[TelegramMessage]))(
@@ -105,7 +108,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
     "call confirm when receives user SMSID reply" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       val userSession = parent.childActorOf( Props(
-        new UserSession(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler) {
+        new UserSession(1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest), Some(tinkoffApiTest),
+          Some(time.scheduler)) {
           override def requestSMSId(text: String) = Unit
         })
       )
@@ -125,7 +129,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
     "call LevelUp when receives Confirm" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       val userSession = parent.childActorOf(
-        UserSession.props(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler)
+        Props(classOf[UserSession], 1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest),
+          Some(tinkoffApiTest), Some(time.scheduler))
       )
       userSession ! testConfirm
       eventually {
@@ -139,7 +144,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
     "become Registered when receive success LevelUp and send initial command" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       val userSession = parent.childActorOf( Props(
-        new UserSession(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler) {
+        new UserSession(1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest), Some(tinkoffApiTest),
+          Some(time.scheduler)) {
           override def processAccounts(f: (AccountsFlat) => String): Unit = {
             tinkoffApiTest.accountsFlat(session)
           }
@@ -161,7 +167,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
     "when Registered call WarmUp Session" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       val userSession = parent.childActorOf( Props(
-        new UserSession(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler) {
+        new UserSession(1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest), Some(tinkoffApiTest),
+          Some(time.scheduler)) {
           override def processAccounts(f: (AccountsFlat) => String): Unit = {
             tinkoffApiTest.accountsFlat(session)
           }
@@ -180,7 +187,8 @@ class UserSessionTest extends TestKit(ActorSystem("testBotSystem"))
     "kill self after 5 minutes waiting for User Message" in {
       val (tinkoffApiTest, telegramApiTest, time, parent) = createFixture
       val userSession = parent.childActorOf(
-        UserSession.props(1, testContact, BalanceCommand(testUser, 1), telegramApiTest, tinkoffApiTest, time.scheduler)
+        Props(classOf[UserSession], 1, testContact, BalanceCommand(testUser, 1), Some(telegramApiTest),
+          Some(tinkoffApiTest), Some(time.scheduler))
       )
       parent watch  userSession
       userSession ! testSession
