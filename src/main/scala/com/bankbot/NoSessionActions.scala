@@ -5,10 +5,10 @@ import java.time.{Instant, ZoneId}
 import akka.actor.{Actor, ActorLogging, Props, Scheduler}
 import akka.event.LoggingAdapter
 import com.bankbot.telegram.TelegramTypes.TelegramMessage
-import com.bankbot.tinkoff.TinkoffApi
+import com.bankbot.tinkoff.{TinkoffApi, TinkoffApiImpl}
 
 import scala.concurrent.duration._
-import telegram.{PrettyMessage, TelegramApi}
+import telegram.{PrettyMessage, TelegramApi, TelegramApiImpl}
 import tinkoff.TinkoffTypes.{Rate, ServerAnswer}
 
 /**
@@ -17,8 +17,9 @@ import tinkoff.TinkoffTypes.{Rate, ServerAnswer}
   */
 
 object NoSessionActions {
-  def props(scheduler: Scheduler, updateRatesInterval: Int, telegramApi: TelegramApi, tinkoffApi: TinkoffApi) =  Props(
-    classOf[NoSessionActions], scheduler, updateRatesInterval, telegramApi, tinkoffApi
+  def props(updateRatesInterval: Int) =
+    Props(
+    classOf[NoSessionActions], None, updateRatesInterval, None, None
   )
 
   case object GetRates
@@ -27,11 +28,17 @@ object NoSessionActions {
   case class SendMessage(chatId: Int, text: String)
 }
 
-class NoSessionActions(scheduler: Scheduler, updateRatesInterval: Int, telegramApi: TelegramApi,
-                       tinkoffApi: TinkoffApi) extends Actor with ActorLogging {
+class NoSessionActions(mayBeScheduler: Option[Scheduler], updateRatesInterval: Int, mayBeTelegramApi: Option[TelegramApi],
+                       mayBeTinkoffApi: Option[TinkoffApi]) extends Actor with ActorLogging {
   import NoSessionActions._
   import context.dispatcher
   implicit val logger: LoggingAdapter = log
+  implicit val system = context.system
+  val scheduler = mayBeScheduler.getOrElse(context.system.scheduler)
+  val telegramApi = mayBeTelegramApi.getOrElse(new TelegramApiImpl)
+  val tinkoffApi = mayBeTinkoffApi.getOrElse(new TinkoffApiImpl)
+
+  log.info("NoSession actions created! " + context.self.path.toString)
 
   val updateCancellable = scheduler.schedule(1 second, updateRatesInterval millis, self, UpdateRates)
   var rates: Vector[Rate] = Vector()

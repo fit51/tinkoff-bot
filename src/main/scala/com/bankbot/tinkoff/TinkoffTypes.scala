@@ -25,7 +25,7 @@ object TinkoffTypes {
   case class ConfirmPayLoad(accessLevel: String, sessionid: String, sessionTimeout: Int, additionalAuth: AdditionalAuth,
                             userId: String)
 
-  case class Confirm(resultCode: String, payload: Option[ConfirmPayLoad])
+  case class Confirm(resultCode: String, payload: Either[ConfirmPayLoad, Confirmation])
 
   case class AccessLevel(accessLevel: String)
 
@@ -71,10 +71,10 @@ trait MessageMarshallingTinkoff extends DefaultJsonProtocol {
   implicit val signUpFormat = jsonFormat3(SignUp)
   implicit val additionalAuthFormat = jsonFormat3(AdditionalAuth)
   implicit val confirmPayLoadFormat = jsonFormat5(ConfirmPayLoad)
+  implicit val confirmationFormat = jsonFormat1(Confirmation)
   implicit val confirmFormat = jsonFormat2(Confirm)
   implicit val accessLevelFormat = jsonFormat1(AccessLevel)
   implicit val levelUpFormat = jsonFormat2(LevelUp)
-  implicit val confirmationFormat = jsonFormat1(Confirmation)
   implicit val warmUpFormat = jsonFormat1(WarmUp)
   implicit val sessionStatusPayLoadFormat = jsonFormat4(SessionStatusPayLoad)
   implicit val sessionStatusFormat = jsonFormat3(SessionStatus)

@@ -2,7 +2,7 @@ package com.bankbot
 
 import java.time.{Instant, ZoneId}
 
-import akka.actor.{ActorContext, ActorRef, ActorSystem}
+import akka.actor.{ActorContext, ActorRef, ActorSystem, Props}
 import akka.event.LoggingAdapter
 import akka.testkit.{ImplicitSender, TestKit}
 import com.bankbot.NoSessionActions._
@@ -38,7 +38,8 @@ class NoSessionActionsTest extends TestKit(ActorSystem("testBotSystem"))
   val rateNew = Rate("", Currency(0, "USD"), Currency(0, "RUB"), 58.2f, 56.7f)
 
   val time = new VirtualTime
-  val noSessionActions = system.actorOf(NoSessionActions.props(time.scheduler, 2000, telegramApiTest, tinkoffApiTest))
+  val noSessionActions = system.actorOf(Props(classOf[NoSessionActions], Some(time.scheduler), 2000,
+    Some(telegramApiTest), Some(tinkoffApiTest)))
   time.advance(1 second)
 
   "NoSessionActions" must {

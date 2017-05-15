@@ -139,7 +139,13 @@ class TinkoffApiImpl(implicit system: ActorSystem)
     (response flatMap {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
         logger.debug("Tinkoff confirm Request Success")
-        Unmarshal(entity).to[Confirm]      }
+        Unmarshal(entity).to[Confirm].recover {
+          case e => {
+            logger.info("SMS confirmation Unmarshalling failed")
+            Confirm("Unmarhal failure", Right(Confirmation("Empty")))
+          }
+        }
+      }
       case HttpResponse(code, _, entity, _) => {
         logger.warning("Tinkoff confirm Request failed, response code: " + code)
         throw ResponceCodeException("Tinkoff Responce code:", entity)

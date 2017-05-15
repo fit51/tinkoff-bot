@@ -19,6 +19,7 @@ target
 **/project/project/target
 #telegram key
 src/main/resources/telegram.conf
+src/main/scala/Test.scala
 
 # WorkSheet files
 *.sc

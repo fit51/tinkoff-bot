@@ -43,11 +43,11 @@ class TelegramApiImpl(implicit system: ActorSystem) extends TelegramApi with Mes
     val response = http.singleRequest(HttpRequest(uri = uri))
     (response flatMap {
       case HttpResponse(StatusCodes.OK, _, entity, _) => {
-        logger.debug("Telegram getUpdates Request Success")
+        //logger.debug("Telegram getUpdates Request Success")
         Unmarshal(entity).to[ServerAnswer]
       }
       case HttpResponse(code, _, entity, _) => {
-        logger.warning("Telegram getUpdates Request failed, response code: " + code)
+        //logger.warning("Telegram getUpdates Request failed, response code: " + code)
         throw ResponceCodeException("Telegram getUpdates Responce code:", entity)
       }
     } recover {

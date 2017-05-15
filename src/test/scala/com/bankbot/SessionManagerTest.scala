@@ -38,7 +38,7 @@ class SessionManagerTest extends TestKit(ActorSystem("testBotSystem"))
 
   val testUserSession = TestProbe(testChat.id.toString)
   val sessionManager = system.actorOf(Props(
-    new SessionManager(telegramApiTest, tinkoffApiTest) {
+    new SessionManager(Some(telegramApiTest), Some(tinkoffApiTest)) {
       override def createUserSession(name: String, command: SessionCommand): ActorRef = testUserSession.ref
     }
   ))

@@ -32,6 +32,7 @@ class TelegramUpdaterTest extends TestKit(ActorSystem("testBotSystem"))
   val telegramUpdaterTest = system.actorOf(
       TelegramUpdater.props(sessionManagerTest.ref, noSessionActionsTest.ref, telegramApiTest)
     )
+  telegramUpdaterTest ! StartProcessing
   val testChat = Chat(1, "private")
   val testUser = User(1, "Name", Some("LastName"), Some("Login"))
   val testMessage = Message(1, Some(testUser), testChat, 123, None, Some("/bla"), None)
